@@ -5,7 +5,6 @@ import { exec } from 'child_process';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
-const chokidar = require('chokidar');
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '..');
@@ -38,7 +37,9 @@ function startWatcher() {
   const srcDir = join(projectRoot, 'src');
   let watcher;
 
+  let chokidar;
   try {
+    chokidar = require('chokidar');
     watcher = chokidar.watch(srcDir, { ignoreInitial: true });
   } catch (err) {
     console.warn('Could not start file watcher:', err.message);
