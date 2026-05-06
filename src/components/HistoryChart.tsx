@@ -1,9 +1,15 @@
 import { Line } from 'react-chartjs-2';
-import { SCORE_HISTORY } from '../lib/snapshot';
+import { TsRow } from '../lib/scoring';
 import { tickStyle, gridStyle } from '../lib/chartSetup';
 
-export function HistoryChart() {
-  const { dates, scores, prices } = SCORE_HISTORY;
+interface Props { timeseries: TsRow[]; }
+
+export function HistoryChart({ timeseries }: Props) {
+  const rows  = timeseries.filter(r => r.score !== null);
+  const dates  = rows.map(r => r.date);
+  const scores = rows.map(r => r.score);
+  const prices = rows.map(r => r.spy);
+
   const data = {
     labels: dates,
     datasets: [
@@ -30,8 +36,8 @@ export function HistoryChart() {
         borderDash: [3, 3],
       },
       {
-        label: '30 threshold',
-        data: dates.map(() => 30),
+        label: '20 threshold',
+        data: dates.map(() => 20),
         borderColor: 'rgba(217,79,61,0.5)',
         borderWidth: 1,
         pointRadius: 0,
@@ -39,8 +45,8 @@ export function HistoryChart() {
         yAxisID: 'yL',
       },
       {
-        label: '65 strong',
-        data: dates.map(() => 65),
+        label: '60 bullish',
+        data: dates.map(() => 60),
         borderColor: 'rgba(31,168,118,0.35)',
         borderWidth: 1,
         pointRadius: 0,
@@ -51,31 +57,25 @@ export function HistoryChart() {
   };
 
   return (
-    <Line
-      data={data}
-      options={{
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
-        interaction: { mode: 'index', intersect: false },
-        scales: {
-          x: { ticks: { ...tickStyle, maxTicksLimit: 16, maxRotation: 45 } as any, grid: gridStyle },
-          yL: {
-            position: 'left',
-            min: 0,
-            max: 100,
-            ticks: tickStyle as any,
-            grid: gridStyle,
-            title: { display: true, text: 'Score', font: { size: 10, family: 'IBM Plex Mono' }, color: '#565a61' },
-          },
-          yR: {
-            position: 'right',
-            ticks: { ...tickStyle, callback: (v: any) => '$' + v } as any,
-            grid: { display: false },
-            title: { display: true, text: 'SPY $', font: { size: 10, family: 'IBM Plex Mono' }, color: '#565a61' },
-          },
+    <Line data={data} options={{
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { ticks: { ...tickStyle, maxTicksLimit: 16, maxRotation: 45 } as any, grid: gridStyle },
+        yL: {
+          position: 'left', min: 0, max: 100,
+          ticks: tickStyle as any, grid: gridStyle,
+          title: { display: true, text: 'Score', font: { size: 10, family: 'IBM Plex Mono' }, color: '#565a61' },
         },
-      }}
-    />
+        yR: {
+          position: 'right',
+          ticks: { ...tickStyle, callback: (v: any) => '$' + v } as any,
+          grid: { display: false },
+          title: { display: true, text: 'SPY $', font: { size: 10, family: 'IBM Plex Mono' }, color: '#565a61' },
+        },
+      },
+    }} />
   );
 }

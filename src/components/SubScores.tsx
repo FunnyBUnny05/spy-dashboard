@@ -1,37 +1,57 @@
 import { SignalSpec } from '../lib/scoring';
-import { toneForScore, toneColor } from '../lib/format';
 
 interface Props {
   signals: SignalSpec[];
+}
+
+// Color based on how extreme the percentile is (bearish direction depends on rho)
+function pctileColor(pctile: number, rho: number): string {
+  // rho < 0 means high value = bearish; rho > 0 means high value = bullish
+  const bearPctile = rho < 0 ? pctile : 100 - pctile;
+  if (bearPctile >= 85) return 'var(--bear)';
+  if (bearPctile >= 70) return 'var(--warn)';
+  if (bearPctile <= 25) return 'var(--bull, #4ade80)';
+  return 'var(--text)';
+}
+
+function formatValue(sig: SignalSpec): string {
+  if (sig.key === 'aaii')  return (sig.value * 100).toFixed(1) + '%';
+  if (sig.key === 'ppi')   return sig.value.toFixed(2) + '% YoY';
+  if (sig.key === 'mdebt') return (sig.value >= 0 ? '+' : '') + sig.value.toFixed(1) + '% YoY';
+  if (sig.key === 'vix')   return sig.value.toFixed(2);
+  if (sig.key === 'trend') return (sig.value >= 0 ? '+' : '') + sig.value.toFixed(2) + '%';
+  return sig.value.toFixed(1);
 }
 
 export function SubScores({ signals }: Props) {
   return (
     <div className="subs">
       {signals.map((s) => {
-        const tone = toneForScore(s.score);
-        const color = toneColor(tone);
-        const isAaii = s.key === 'aaii';
-        const isBuffett = s.key === 'buffett';
-        const cls = isAaii ? 'sub aaii-new' : isBuffett ? 'sub buffett-new' : 'sub';
-        const nameCls = isAaii ? 'sub-name aaii-color' : isBuffett ? 'sub-name purple' : 'sub-name';
-        const tagCls = isAaii ? 'new-tag aaii-color' : 'new-tag purple';
+        const color = pctileColor(s.pctile, s.rho12m);
+        // Bearish direction bar fill
+        const bearPctile = s.rho12m < 0 ? s.pctile : 100 - s.pctile;
         return (
-          <div key={s.key} className={cls}>
-            {(isAaii || isBuffett) && <div className={tagCls}>NEW</div>}
-            <div className={nameCls}>
-              {isAaii && '★ '}
-              {isBuffett && '★ '}
-              {s.label}
-            </div>
+          <div key={s.key} className="sub">
+            <div className="sub-category">{s.category}</div>
+            <div className="sub-name">{s.label}</div>
             <div className="sub-score" style={{ color }}>
-              {Math.round(s.score)}
+              {formatValue(s)}
             </div>
-            <div className="sub-raw">{s.raw}</div>
-            <div className="sub-bar">
-              <div className="sub-fill" style={{ width: `${s.score}%`, background: color }} />
+            {/* Percentile bar */}
+            <div className="sub-bar" title={`${s.pctile.toFixed(0)}th historical percentile`}>
+              <div className="sub-fill" style={{ width: `${s.pctile}%`, background: color }} />
+              <div className="sub-bar-mid" />
             </div>
-            <div className="sub-desc">{s.desc}</div>
+            <div className="sub-raw" style={{ color: 'var(--text3)' }}>
+              {s.pctile.toFixed(0)}th pct
+              <span style={{ color: s.rho12m < 0 ? 'var(--text3)' : 'var(--text3)', marginLeft: 6 }}>
+                ρ={s.rho12m >= 0 ? '+' : ''}{s.rho12m.toFixed(2)}
+              </span>
+            </div>
+            {/* Bearish-direction fill (how concerning is this reading) */}
+            <div className="sub-bear-bar" title={`${bearPctile.toFixed(0)}% bearish pressure`}>
+              <div className="sub-bear-fill" style={{ width: `${bearPctile}%`, background: color, opacity: 0.4 }} />
+            </div>
           </div>
         );
       })}

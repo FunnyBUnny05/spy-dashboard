@@ -1,11 +1,14 @@
+import { TsRow } from '../lib/scoring';
 import { HistoryChart } from './HistoryChart';
 
-export function HistoryPanel() {
+interface Props { timeseries: TsRow[]; }
+
+export function HistoryPanel({ timeseries }: Props) {
   return (
     <>
       <div className="chart-box">
         <div className="chart-title">
-          <span>Composite score (left) vs SPY price (right) — 2014 to Apr 2026</span>
+          <span>Composite score (left) vs SPY price (right) — 2014 to present</span>
           <div style={{ display: 'flex', gap: 14, fontSize: 11, color: 'var(--text2)' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--blue)' }} />
@@ -17,19 +20,22 @@ export function HistoryPanel() {
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <span style={{ width: 8, height: 8, borderRadius: 2, background: 'rgba(217,79,61,0.5)' }} />
-              30 threshold
+              20 threshold
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 8, height: 8, borderRadius: 2, background: 'rgba(31,168,118,0.5)' }} />
+              60 bullish
             </span>
           </div>
         </div>
         <div className="chart-wrap" style={{ height: 360 }}>
-          <HistoryChart />
+          <HistoryChart timeseries={timeseries} />
         </div>
       </div>
-      <div className="callout callout-bear">
-        <strong>The only comparable readings in 12 years:</strong> Jul 2021 (24.7) and Sep 2021
-        (29.7) — both immediately before the 2022 bear market (SPY −25%). Current 29.1 sits in that
-        exact zone, pinned there by Buffett's +2σ reading. The critical difference: those 2021
-        readings occurred at relative highs. The current reading is at an absolute ATH of $720.65.
+      <div className="callout callout-info">
+        <strong>v4 PCA+OLS model</strong> — scores derived from walk-forward OLS predictions,
+        percentile-ranked against the historical prediction distribution (n=145). Gaps indicate
+        the initial warm-up period before sufficient data for rolling estimation.
       </div>
     </>
   );
