@@ -2,10 +2,21 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { exec } from 'child_process';
+import { readFileSync } from 'fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const projectRoot = join(__dirname, '..');
 const isDev = process.env.NODE_ENV === 'development';
+
+// In dev, projectRoot is the repo itself.
+// In production (packaged .app), __dirname is deep inside the bundle, so we
+// read the absolute source path that was stamped in at build time.
+let projectRoot = join(__dirname, '..');
+try {
+  const stamped = JSON.parse(readFileSync(join(__dirname, 'source-path.json'), 'utf8'));
+  if (stamped.path) projectRoot = stamped.path;
+} catch {
+  // dev mode or file missing — fall back to relative path
+}
 
 let win = null;
 

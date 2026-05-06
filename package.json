@@ -8,7 +8,8 @@
     "dev": "vite",
     "dev:electron": "concurrently \"vite\" \"cross-env NODE_ENV=development electron .\"",
     "build": "tsc -b && vite build",
-    "build:app": "npm run build && electron-builder",
+    "write-source-path": "node -e \"const fs=require('fs');fs.writeFileSync('electron/source-path.json',JSON.stringify({path:process.cwd()}))\"",
+    "build:app": "npm run write-source-path && npm run build && electron-builder",
     "preview": "vite preview",
     "update-aaii": "python3 scripts/update_aaii.py",
     "lint": "eslint ."

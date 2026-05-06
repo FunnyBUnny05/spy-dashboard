@@ -5,3 +5,4 @@ dist
 !.vscode/extensions.json
 *.local
 .env*
+electron/source-path.json
