@@ -6,27 +6,42 @@ interface Props { timeseries: TsRow[]; }
 
 export function HistoryChart({ timeseries }: Props) {
   const rows  = timeseries.filter(r => r.score !== null);
-  const dates  = rows.map(r => r.date);
-  const scores = rows.map(r => r.score);
-  const prices = rows.map(r => r.spy);
+  const dates = rows.map(r => r.date);
+  // Per-point inSample lookup keyed on the rendered dataset index.
+  const inSampleAt: boolean[] = rows.map(r => r.inSample);
 
+  // Single dataset; segment styling renders dashed/lighter where either
+  // endpoint is in-sample (look-ahead). This keeps the line continuous
+  // across the OOS → in-sample boundary without a visible gap.
   const data = {
     labels: dates,
     datasets: [
       {
         label: 'Composite Score',
-        data: scores,
+        data: rows.map(r => r.score),
         borderColor: '#3d7fd4',
         backgroundColor: 'rgba(61,127,212,0.07)',
         borderWidth: 1.5,
-        pointRadius: 0,
+        pointRadius: (ctx: any) => inSampleAt[ctx.dataIndex] ? 1.6 : 0,
+        pointBackgroundColor: 'rgba(61,127,212,0.55)',
+        pointBorderWidth: 0,
         fill: true,
         tension: 0.3,
         yAxisID: 'yL',
+        segment: {
+          borderColor: (ctx: any) => {
+            const inSample = inSampleAt[ctx.p0DataIndex] || inSampleAt[ctx.p1DataIndex];
+            return inSample ? 'rgba(61,127,212,0.55)' : '#3d7fd4';
+          },
+          borderDash: (ctx: any) => {
+            const inSample = inSampleAt[ctx.p0DataIndex] || inSampleAt[ctx.p1DataIndex];
+            return inSample ? [4, 3] : undefined;
+          },
+        },
       },
       {
         label: 'SPY Price',
-        data: prices,
+        data: rows.map(r => r.spy),
         borderColor: '#565a61',
         borderWidth: 1,
         pointRadius: 0,
@@ -60,7 +75,19 @@ export function HistoryChart({ timeseries }: Props) {
     <Line data={data} options={{
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          mode: 'index', intersect: false,
+          callbacks: {
+            afterLabel: (c: any) => {
+              if (c.datasetIndex !== 0) return '';
+              const idx = c.dataIndex;
+              return inSampleAt[idx] ? '(in-sample fit)' : '(walk-forward OOS)';
+            },
+          },
+        },
+      },
       interaction: { mode: 'index', intersect: false },
       scales: {
         x: { ticks: { ...tickStyle, maxTicksLimit: 16, maxRotation: 45 } as any, grid: gridStyle },

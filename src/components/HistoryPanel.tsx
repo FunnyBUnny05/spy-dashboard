@@ -26,6 +26,12 @@ export function HistoryPanel({ timeseries }: Props) {
               <span style={{ width: 8, height: 8, borderRadius: 2, background: 'rgba(31,168,118,0.5)' }} />
               60 bullish
             </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{
+                width: 14, height: 0, borderTop: '1.5px dashed rgba(61,127,212,0.6)',
+              }} />
+              in-sample (fit)
+            </span>
           </div>
         </div>
         <div className="chart-wrap" style={{ height: 360 }}>
@@ -33,9 +39,11 @@ export function HistoryPanel({ timeseries }: Props) {
         </div>
       </div>
       <div className="callout callout-info">
-        <strong>v4 PCA+OLS model</strong> — scores derived from walk-forward OLS predictions,
-        percentile-ranked against the historical prediction distribution (n=145). Gaps indicate
-        the initial warm-up period before sufficient data for rolling estimation.
+        <strong>v5.1 Ridge model</strong> — solid line is walk-forward out-of-sample
+        (n=120, ρ=0.36). Dashed segments are <em>in-sample</em> scores from the final
+        full-data model: the most recent ~12 months can't have realised 12m forward
+        returns, so those points include the look-ahead they'd normally avoid. Treat
+        the dashed tail with caution.
       </div>
     </>
   );

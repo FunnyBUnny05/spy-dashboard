@@ -1,5 +1,5 @@
 /**
- * SPY Composite Scoring System v5
+ * SPY Composite Scoring System v5.1
  *
  * Model: Ridge regression directly on z-scored signals (no PCA)
  *
@@ -8,11 +8,13 @@
  *   2. Z-score 5 signals (rsi, mfi, ema_dist, aaii, vix)
  *      Rank-Gauss normalise 2 signals (ppi_yoy, mdebt_yoy)
  *   3. pred_fwd_12m = intercept + Σ ridge_coef_k * z_k
- *   4. Composite score = norm.cdf((pred − 0.08) / resid_std) × 100
- *      score=50 always means "at long-run drift (+8% 12m)"
- *
- * OOS (walk-forward): Spearman ρ=0.301, residual std=13.1%, n=108 predictions
- * Ridge alpha = 0.01 (tuned via TimeSeriesSplit CV)
+ *   4. Composite score = norm.cdf((pred − drift) / σ(VIX)) × 100
+ *      where drift = full-sample mean fwd_12m, and σ(VIX) is the
+ *      VIX-conditional residual std (heteroscedastic):
+ *        σ²(t) = max(floor, a + b·vix_z(t))
+ *      score=50 means "predicted return equals the historical drift"
+ *   5. Empirical historical percentiles for all 7 signals (no synthetic
+ *      Gaussian fictions for skewed signals like VIX/AAII).
  */
 
 import modelData from '../data/model.json';
@@ -58,12 +60,30 @@ const STDS        = (modelData as any).stds    as Record<string, number>;
 const RIDGE_COEFS = (modelData as any).ridge_coefs as Record<string, number>;
 const RIDGE_INT   = (modelData as any).ridge_intercept as number;
 const RESID_STD   = (modelData as any).resid_std as number;
-const DRIFT       = (modelData as any).drift as number;  // 0.08
+const DRIFT       = (modelData as any).drift as number;
+
+// Heteroscedastic residual variance:  σ²(t) = max(floor, a + b · vix_z(t))
+const RESID_VAR_A     = ((modelData as any).resid_var_a     ?? RESID_STD * RESID_STD) as number;
+const RESID_VAR_B     = ((modelData as any).resid_var_b     ?? 0) as number;
+const RESID_VAR_FLOOR = ((modelData as any).resid_var_floor ?? 1e-4) as number;
+const VIX_Z_MEAN      = ((modelData as any).vix_z_mean ?? MEANS['vix_close']) as number;
+const VIX_Z_STD       = ((modelData as any).vix_z_std  ?? STDS['vix_close'])  as number;
+
+function condResidStd(vixClose: number): number {
+  const vz = (vixClose - VIX_Z_MEAN) / VIX_Z_STD;
+  const v  = Math.max(RESID_VAR_FLOOR, RESID_VAR_A + RESID_VAR_B * vz);
+  return Math.sqrt(v);
+}
 
 // Rank-Gauss reference distributions (sorted arrays from full training data)
 const RG_PPI_SORTED   = (modelData as any).rank_gauss_ppi_sorted   as number[];
 const RG_MDEBT_SORTED = (modelData as any).rank_gauss_mdebt_sorted as number[];
 const RANK_GAUSS_SIGNALS = new Set(['ppi_yoy', 'mdebt_yoy']);
+
+// Empirical sorted arrays for ALL 7 signals (for true historical percentiles).
+// Falls back to a synthetic Gaussian draw only if the field is missing in
+// older model.json files.
+const SIGNAL_SORTED = ((modelData as any).signal_sorted ?? {}) as Record<string, number[]>;
 
 const SIGNAL_META: Record<string, { label: string; category: string; rho12m: number }> = {
   rsi_14m:     { label: 'RSI (14m)',           category: 'Momentum',          rho12m: -0.523 },
@@ -145,22 +165,24 @@ function historicalPctile(value: number, sorted: number[]): number {
   return (sortedRank(sorted, value) / sorted.length) * 100;
 }
 
-// Pre-built sorted arrays for 5 z-score signals (extracted from model.json timeseries)
+// Empirical sorted arrays per signal — prefer real history, fall back to a
+// synthetic Gaussian draw only if model.json predates v5.1.
 const _sigSorted: Record<string, number[]> = {};
 function getSorted(sigKey: string): number[] {
-  if (!_sigSorted[sigKey]) {
-    if (sigKey === 'ppi_yoy')   { _sigSorted[sigKey] = RG_PPI_SORTED; return _sigSorted[sigKey]; }
-    if (sigKey === 'mdebt_yoy') { _sigSorted[sigKey] = RG_MDEBT_SORTED; return _sigSorted[sigKey]; }
-    // Build from means/stds — approximate using rank_gauss refs as proxy size
-    const n = RG_PPI_SORTED.length;
-    const m = MEANS[sigKey], s = STDS[sigKey];
-    const arr: number[] = [];
-    for (let i = 1; i <= n; i++) {
-      arr.push(m + s * normInv(i / (n + 1)));
-    }
-    _sigSorted[sigKey] = arr;
+  if (_sigSorted[sigKey]) return _sigSorted[sigKey];
+  if (SIGNAL_SORTED[sigKey] && SIGNAL_SORTED[sigKey].length > 0) {
+    _sigSorted[sigKey] = SIGNAL_SORTED[sigKey];
+    return _sigSorted[sigKey];
   }
-  return _sigSorted[sigKey];
+  if (sigKey === 'ppi_yoy')   { _sigSorted[sigKey] = RG_PPI_SORTED;   return _sigSorted[sigKey]; }
+  if (sigKey === 'mdebt_yoy') { _sigSorted[sigKey] = RG_MDEBT_SORTED; return _sigSorted[sigKey]; }
+  // Legacy fallback: synthetic Gaussian draw around mean/std.
+  const n = RG_PPI_SORTED.length;
+  const m = MEANS[sigKey], s = STDS[sigKey];
+  const arr: number[] = [];
+  for (let i = 1; i <= n; i++) arr.push(m + s * normInv(i / (n + 1)));
+  _sigSorted[sigKey] = arr;
+  return arr;
 }
 
 // ── Core model computation ────────────────────────────────────────────────────
@@ -214,15 +236,17 @@ export function computeV2(raw: RawSignalValues): V5Result {
   // 3. Ridge prediction
   const predFwd12m = RIDGE_INT + signals.reduce((acc, s) => acc + s.ridgeCoef * s.zVal, 0);
 
-  // 4. Prediction intervals
+  // 4. Prediction intervals — use VIX-conditional residual std
+  const sigmaT = condResidStd(raw.vixClose);
   const z80 = 1.282, z95 = 1.960;
-  const pi80Lo = predFwd12m - z80 * RESID_STD;
-  const pi80Hi = predFwd12m + z80 * RESID_STD;
-  const pi95Lo = predFwd12m - z95 * RESID_STD;
-  const pi95Hi = predFwd12m + z95 * RESID_STD;
+  const pi80Lo = predFwd12m - z80 * sigmaT;
+  const pi80Hi = predFwd12m + z80 * sigmaT;
+  const pi95Lo = predFwd12m - z95 * sigmaT;
+  const pi95Hi = predFwd12m + z95 * sigmaT;
 
-  // 5. Fixed-CDF score — score=50 always means pred equals long-run drift
-  const compositeScore = normCdf((predFwd12m - DRIFT) / RESID_STD) * 100;
+  // 5. Composite score — fixed CDF anchored at sample-mean drift, scaled by
+  //    the regime-conditional residual std. score=50 ⇔ pred equals drift.
+  const compositeScore = normCdf((predFwd12m - DRIFT) / sigmaT) * 100;
 
   // 6. Regime
   const vixRegime = raw.vixClose > 25 ? 'high_vol' : raw.vixClose < 15 ? 'low_vol' : 'normal_vol';
@@ -288,11 +312,16 @@ export interface TsRow {
   score: number | null;
   pred: number | null;
   regime: string;
+  /** true ⇒ score is from the final full-sample model (look-ahead); false ⇒ walk-forward OOS. */
+  inSample: boolean;
 }
 
 export function getTimeseries(): TsRow[] {
   return ((modelData as any).timeseries as any[]).map((r: any) => ({
-    date: r.d, spy: r.spy, score: r.score ?? null, pred: r.pred ?? null, regime: r.regime ?? '',
+    date: r.d, spy: r.spy,
+    score: r.score ?? null, pred: r.pred ?? null,
+    regime: r.regime ?? '',
+    inSample: r.in_sample === true,
   }));
 }
 

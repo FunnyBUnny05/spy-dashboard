@@ -75,6 +75,7 @@ export default function App() {
       score: result.compositeScore,
       pred:  result.predFwd12m,
       regime: result.regime,
+      inSample: true,   // live point uses the full-sample model
     });
     return filtered;
   }, [result, spySignals]);

@@ -20,8 +20,8 @@ export function BucketsPanel({ currentBucket, predFwd12m, pi80Lo, pi80Hi, pi95Lo
       <div>
         <div className="chart-box">
           <div className="chart-title">
-            <span>Walk-forward OLS forecast (2015–2026, n=145)</span>
-            <span style={{ color: 'var(--text3)', fontSize: 10 }}>quintile buckets · 80%/95% CI</span>
+            <span>Walk-forward Ridge forecast (v5.1, n=120)</span>
+            <span style={{ color: 'var(--text3)', fontSize: 10 }}>quintile buckets · Newey-West HAC CI · 80/95% PI scaled by VIX</span>
           </div>
 
           {/* Forecast bar */}
@@ -62,19 +62,29 @@ export function BucketsPanel({ currentBucket, predFwd12m, pi80Lo, pi80Hi, pi95Lo
             <tbody>
               {BUCKETS.map((b) => {
                 const isCurrent = b.lo === currentBucket.lo;
+                const sparse = b.n < 5;
+                const empty  = b.n === 0;
                 const cls = b.mean < 0 ? 'bear' : b.mean < 0.07 ? 'warn' : b.mean < 0.15 ? 'neut' : 'bull';
                 return (
-                  <tr key={b.lo} className={isCurrent ? 'current-row' : ''}>
-                    <td>{isCurrent && '★ '}{b.label}</td>
-                    <td style={{ color: 'var(--text3)' }}>{b.n}</td>
-                    <td className={cls} style={{ fontWeight: 600 }}>{pct(b.mean)}</td>
+                  <tr key={b.lo} className={isCurrent ? 'current-row' : ''} style={empty ? { opacity: 0.45 } : undefined}>
+                    <td>
+                      {isCurrent && '★ '}{b.label}
+                      {sparse && !empty && (
+                        <span title="Sparse sample — CI is wide" style={{ color: 'var(--warn)', marginLeft: 4 }}>*</span>
+                      )}
+                      {empty && (
+                        <span title="No OOS predictions ever fell in this bucket" style={{ color: 'var(--text3)', marginLeft: 4 }}>—</span>
+                      )}
+                    </td>
+                    <td style={{ color: sparse ? 'var(--warn)' : 'var(--text3)' }}>{b.n}</td>
+                    <td className={empty ? '' : cls} style={{ fontWeight: 600 }}>{empty ? '—' : pct(b.mean)}</td>
                     <td style={{ color: 'var(--text3)', fontSize: 10 }}>
-                      [{pct(b.ciLo, 0)}, {pct(b.ciHi, 0)}]
+                      {empty ? '—' : `[${pct(b.ciLo, 0)}, ${pct(b.ciHi, 0)}]`}
                     </td>
-                    <td className={b.pctNeg > 30 ? 'bear' : b.pctNeg > 15 ? 'warn' : 'bull'}>
-                      {b.pctNeg.toFixed(0)}%
+                    <td className={empty ? '' : (b.pctNeg > 30 ? 'bear' : b.pctNeg > 15 ? 'warn' : 'bull')}>
+                      {empty ? '—' : `${b.pctNeg.toFixed(0)}%`}
                     </td>
-                    <td className="bear">{pct(b.worst)}</td>
+                    <td className={empty ? '' : 'bear'}>{empty ? '—' : pct(b.worst)}</td>
                   </tr>
                 );
               })}
@@ -83,10 +93,21 @@ export function BucketsPanel({ currentBucket, predFwd12m, pi80Lo, pi80Hi, pi95Lo
         </div>
 
         <div className="callout callout-bear" style={{ marginTop: 12 }}>
-          Currently in <strong>{currentBucket.label}</strong> — n={currentBucket.n} historical samples.
-          12m mean {pct(currentBucket.mean)}, worst case {pct(currentBucket.worst)},{' '}
-          {currentBucket.pctNeg.toFixed(0)}% ended negative.
-          OLS model predicts <strong>{pct(predFwd12m)}</strong> with 95% interval [{pct(pi95Lo, 0)}, {pct(pi95Hi, 0)}].
+          Currently in <strong>{currentBucket.label}</strong> — n={currentBucket.n} historical samples
+          {currentBucket.n < 5 && currentBucket.n > 0 && (
+            <span style={{ color: 'var(--warn)' }}> (sparse — wide CI)</span>
+          )}.
+          {currentBucket.n > 0 && <>
+            {' '}12m mean {pct(currentBucket.mean)}, worst case {pct(currentBucket.worst)},{' '}
+            {currentBucket.pctNeg.toFixed(0)}% ended negative.
+          </>}
+          {' '}Ridge model predicts <strong>{pct(predFwd12m)}</strong> with VIX-conditional
+          95% interval [{pct(pi95Lo, 0)}, {pct(pi95Hi, 0)}].
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 6, lineHeight: 1.45 }}>
+          <strong>*</strong> Sparse buckets (n &lt; 5): the model rarely emits scores at the extremes
+          under the v5.1 ridge shrinkage (α=100), so Q1 and Q5 may be thinly populated or empty.
+          This is a property of the prediction distribution, not a fixable defect.
         </div>
       </div>
 
@@ -120,7 +141,7 @@ export function BucketsPanel({ currentBucket, predFwd12m, pi80Lo, pi80Hi, pi95Lo
           })}
         </div>
         <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 12 }}>
-          OOS Spearman ρ = 0.44 · residual std = 11.5%
+          v5.1 Ridge · OOS Spearman ρ = 0.36 · residual std = 12.6% · α=100 (re-tuned)
         </div>
       </div>
     </div>
