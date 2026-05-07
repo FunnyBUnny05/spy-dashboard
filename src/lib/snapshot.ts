@@ -35,7 +35,7 @@ export interface RawSnapshot {
 }
 
 export const CURRENT: RawSnapshot = {
-  asOf: 'Apr 2026',
+  asOf: 'May 2026',
   spyPrice: 720.65,
 
   // SPY-derived (auto-replaced when user drops TradingView CSV)

@@ -60,7 +60,24 @@ export default function App() {
   }), [spySignals, liveData, aaii]);
 
   const result     = useMemo(() => computeV2(rawInputs), [rawInputs]);
-  const timeseries = useMemo(() => getTimeseries(), []);
+
+  // Append the current live score to the end of the historical timeseries so the
+  // chart always shows a line up to today, not just the last walk-forward point (~12m ago).
+  const timeseries = useMemo(() => {
+    const base = getTimeseries();
+    const now  = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    // Replace or append current month
+    const filtered = base.filter(r => r.date !== currentMonth);
+    filtered.push({
+      date:  currentMonth,
+      spy:   spySignals?.priceLatest ?? CURRENT.spyPrice,
+      score: result.compositeScore,
+      pred:  result.predFwd12m,
+      regime: result.regime,
+    });
+    return filtered;
+  }, [result, spySignals]);
 
   const asOfParts: string[] = [];
   if (liveData) {
