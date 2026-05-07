@@ -206,20 +206,59 @@ export async function fetchBuffett(): Promise<BuffettSignal> {
   return scoreBuffett(data);
 }
 
+// ── VIX from FRED ─────────────────────────────────────────────────────────────
+// Series: VIXCLS (daily close). Free API key at fred.stlouisfed.org
+// Store key in .env as VITE_FRED_API_KEY
+
+export interface VixSignal {
+  value: number;
+  asOf: string;
+}
+
+export async function fetchVix(): Promise<VixSignal> {
+  const key = (import.meta as any).env?.VITE_FRED_API_KEY as string | undefined;
+  if (!key) throw new Error('VITE_FRED_API_KEY not set');
+
+  const url = `https://api.stlouisfed.org/fred/series/observations?series_id=VIXCLS&sort_order=desc&limit=10&api_key=${key}&file_type=json`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`FRED VIX fetch failed: ${res.status}`);
+  const json = await res.json();
+
+  // Find the first observation with a real value (not ".")
+  const obs = (json.observations as Array<{ date: string; value: string }>)
+    .find(o => o.value !== '.');
+  if (!obs) throw new Error('No valid VIX observation from FRED');
+
+  return { value: parseFloat(obs.value), asOf: obs.date };
+}
+
 // ── Combined ──────────────────────────────────────────────────────────────────
 
 export interface LiveData {
   ppi: PpiSignal;
   margin: MarginSignal;
   buffett: BuffettSignal;
+  vix: VixSignal | null;   // null if FRED key not set
   fetchedAt: Date;
 }
 
 export async function fetchLiveData(): Promise<LiveData> {
-  const [ppi, margin, buffett] = await Promise.all([
+  const [ppi, margin, buffett, vix] = await Promise.allSettled([
     fetchPpi(),
     fetchMarginDebt(),
     fetchBuffett(),
+    fetchVix(),
   ]);
-  return { ppi, margin, buffett, fetchedAt: new Date() };
+
+  if (ppi.status === 'rejected')    throw ppi.reason;
+  if (margin.status === 'rejected') throw margin.reason;
+  if (buffett.status === 'rejected') throw buffett.reason;
+
+  return {
+    ppi:     (ppi     as PromiseFulfilledResult<PpiSignal>).value,
+    margin:  (margin  as PromiseFulfilledResult<MarginSignal>).value,
+    buffett: (buffett as PromiseFulfilledResult<BuffettSignal>).value,
+    vix:     vix.status === 'fulfilled' ? vix.value : null,
+    fetchedAt: new Date(),
+  };
 }

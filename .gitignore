@@ -6,3 +6,4 @@ dist
 *.local
 .env*
 electron/source-path.json
+.env

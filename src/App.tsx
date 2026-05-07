@@ -23,10 +23,9 @@ import { BuffettPanel }  from './components/BuffettPanel';
 import { AAIIPanel }     from './components/AAIIPanel';
 import { PlaybookPanel } from './components/PlaybookPanel';
 import { MathPanel }     from './components/MathPanel';
-import { PCAPanel }      from './components/PCAPanel';
 import { UpdateBanner }  from './components/UpdateBanner';
 
-type TabId = 'buckets' | 'pca' | 'history' | 'buffett' | 'aaii' | 'playbook' | 'math' | 'data';
+type TabId = 'buckets' | 'history' | 'buffett' | 'aaii' | 'playbook' | 'math' | 'data';
 
 export default function App() {
   const [tab, setTab] = useState<TabId>('buckets');
@@ -57,7 +56,7 @@ export default function App() {
     ppiYoy:     liveData?.ppi.latest.yoy          ?? CURRENT.ppiYoy,
     mdebtYoy:   liveData?.margin.latest.yoy_growth ?? CURRENT.mdebtYoy,
     aaiiSpread: aaii.spread,
-    vixClose:   CURRENT.vixClose,
+    vixClose:   liveData?.vix?.value ?? CURRENT.vixClose,
   }), [spySignals, liveData, aaii]);
 
   const result     = useMemo(() => computeV2(rawInputs), [rawInputs]);
@@ -125,32 +124,29 @@ export default function App() {
         {/* 7-SIGNAL GRID */}
         <div className="section-hdr">
           Seven signals — value · historical percentile · correlation with 12m forward return
-          {liveStatus === 'ok' && <span className="live-badge"> PPI &amp; Margin Debt live</span>}
+          {liveStatus === 'ok' && <span className="live-badge"> PPI · Margin Debt{liveData?.vix ? ' · VIX' : ''} live</span>}
           {spySignals          && <span className="live-badge"> RSI · MFI · Trend from CSV</span>}
         </div>
         <SubScores signals={result.signals} />
 
-        {/* PC SUMMARY ROW */}
+        {/* RIDGE SUMMARY ROW */}
         <div className="pc-summary-row">
-          {([
-            ['PC1 Momentum/Risk',  result.pc1, '55%'],
-            ['PC2 Inflation/Fear', result.pc2, '19%'],
-            ['PC3 Cross-currents', result.pc3, '11%'],
-          ] as [string, number, string][]).map(([label, value, pct]) => {
-            const col = value > 1.5 ? 'var(--bear)' : value > 0.75 ? 'var(--warn)' : value < -1 ? 'var(--bull,#4ade80)' : 'var(--text2)';
+          {result.signals.map(s => {
+            const contrib = s.ridgeCoef * s.zVal;
+            const col = contrib < -0.015 ? 'var(--bear)' : contrib < 0 ? 'var(--warn)' : contrib > 0.015 ? 'var(--bull,#4ade80)' : 'var(--text2)';
             return (
-              <div key={label} className="pc-summary-card" onClick={() => setTab('pca')} style={{ cursor: 'pointer' }}>
-                <div className="pc-summary-label">{label} <span style={{ color: 'var(--text3)' }}>{pct}</span></div>
+              <div key={s.key} className="pc-summary-card" onClick={() => setTab('math')} style={{ cursor: 'pointer' }}>
+                <div className="pc-summary-label">{s.label}</div>
                 <div className="pc-summary-value" style={{ color: col }}>
-                  {value >= 0 ? '+' : ''}{value.toFixed(2)}σ
+                  {contrib >= 0 ? '+' : ''}{(contrib * 100).toFixed(2)}pp
                 </div>
               </div>
             );
           })}
           <div className="pc-summary-card">
-            <div className="pc-summary-label">OLS predicted 12m</div>
+            <div className="pc-summary-label">Ridge pred 12m</div>
             <div className="pc-summary-value" style={{ color: result.predFwd12m >= 0 ? 'var(--bull,#4ade80)' : 'var(--bear)' }}>
-              {result.predFwd12m >= 0 ? '+' : ''}{(result.predFwd12m*100).toFixed(1)}%
+              {result.predFwd12m >= 0 ? '+' : ''}{(result.predFwd12m * 100).toFixed(1)}%
             </div>
           </div>
         </div>
@@ -158,7 +154,6 @@ export default function App() {
         {/* TABS */}
         <div className="tab-bar">
           <button className={`tab-btn ${tab==='buckets'  ?'active':''}`} onClick={()=>setTab('buckets')}>Buckets → Returns</button>
-          <button className={`tab-btn ${tab==='pca'      ?'active':''}`} onClick={()=>setTab('pca')}>PCA Detail</button>
           <button className={`tab-btn ${tab==='history'  ?'active':''}`} onClick={()=>setTab('history')}>Score History</button>
           <button className={`tab-btn ${tab==='aaii'     ?'active':''}`} onClick={()=>setTab('aaii')}
             style={{ color: tab==='aaii' ? 'var(--text)' : 'var(--aaii)' }}>★ AAII</button>
@@ -172,7 +167,6 @@ export default function App() {
         </div>
 
         {tab==='buckets'  && <BucketsPanel currentBucket={result.bucket} predFwd12m={result.predFwd12m} pi80Lo={result.pi80Lo} pi80Hi={result.pi80Hi} pi95Lo={result.pi95Lo} pi95Hi={result.pi95Hi} />}
-        {tab==='pca'      && <PCAPanel pc1={result.pc1} pc2={result.pc2} pc3={result.pc3} regime={result.regime} />}
         {tab==='history'  && <HistoryPanel timeseries={timeseries} />}
         {tab==='aaii'     && <AAIIPanel aaii={aaii} history={aaiiHistory} />}
         {tab==='buffett'  && <BuffettPanel />}
