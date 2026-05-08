@@ -95,6 +95,7 @@ export default function App() {
 
   const s = Math.round(result.compositeScore);
   const scoreBadgeCls = s < 20 ? 'badge-bear' : s < 40 ? 'badge-warn' : s < 60 ? 'badge-warn' : 'badge-new';
+  const scorePillCls  = s < 40 ? 'badge-bear' : s < 60 ? 'badge-warn' : 'badge-new';
   const scoreLabel    = s < 20 ? 'EXTREME CAUTION' : s < 40 ? 'CAUTIOUS' : s < 60 ? 'NEUTRAL' : s < 80 ? 'BULLISH' : 'STRONG BULL';
 
   return (
@@ -102,9 +103,9 @@ export default function App() {
       <UpdateBanner />
       <div className="header">
         <div className="header-left">
-          <h1>SPY COMPOSITE SCORING SYSTEM v4</h1>
+          <h1>SPY COMPOSITE SCORING SYSTEM v5.1</h1>
           <p>
-            PCA + walk-forward OLS · 7 signals · {asOf}
+            Ridge regression · 7 signals · {asOf}
             {' · '}
             <span className={liveStatus === 'ok' ? 'live-dot-ok' : liveStatus === 'error' ? 'live-dot-err' : 'live-dot-loading'}>
               {liveLabel}
@@ -113,11 +114,11 @@ export default function App() {
         </div>
         <div className="header-badges">
           <span className={`badge ${scoreBadgeCls}`}>{scoreLabel}</span>
-          <span className={`badge ${s < 40 ? 'badge-bear' : 'badge-warn'}`}>
+          <span className={`badge ${scorePillCls}`}>
             SCORE {result.compositeScore.toFixed(1)} / 100
           </span>
           <span className="badge badge-warn">
-            OLS {result.predFwd12m >= 0 ? '+' : ''}{(result.predFwd12m*100).toFixed(1)}% 12m
+            Ridge {result.predFwd12m >= 0 ? '+' : ''}{(result.predFwd12m*100).toFixed(1)}% 12m
           </span>
           <span className={`badge ${result.vixRegime === 'high_vol' ? 'badge-bear' : 'badge-aaii'}`}>
             {result.regime}
@@ -194,9 +195,9 @@ export default function App() {
       </div>
 
       <footer>
-        SPY Composite v4 · PCA + walk-forward OLS · {asOf} ·
+        SPY Composite v5.1 · Ridge regression · {asOf} ·
         Signals: RSI, MFI, EMA dist, PPI, Margin Debt, AAII, VIX ·
-        OOS ρ=0.44 · n=145 predictions · Not a forecast
+        OOS ρ=0.364 · n=120 predictions · Not a forecast
       </footer>
     </>
   );

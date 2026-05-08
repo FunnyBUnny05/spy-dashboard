@@ -1,53 +1,62 @@
 import { SignalSpec } from '../lib/scoring';
+import modelData from '../data/model.json';
 
 interface Props {
   signals: SignalSpec[];
   composite: number;
 }
 
-// PC loadings (for display)
-const PC_LOADINGS: Record<string, [number, number, number]> = {
-  rsi:   [-0.52, -0.07, -0.07],
-  mfi:   [-0.50, -0.12, -0.17],
-  trend: [-0.44,  0.00, -0.38],
-  ppi:   [ 0.12, -0.64,  0.52],
-  mdebt: [-0.39,  0.14,  0.57],
-  aaii:  [-0.34, -0.31, -0.48],
-  vix:   [ 0.05,  0.68,  0.08],
-};
+const DRIFT      = (modelData as any).drift        as number;
+const OOS_RHO    = (modelData as any).oos_rho      as number;
+const OOS_N      = (modelData as any).oos_n        as number;
+const INTERCEPT  = (modelData as any).ridge_intercept as number;
+const ALPHA      = (modelData as any).ridge_alpha  as number;
+const RESID_VAR_A = (modelData as any).resid_var_a as number;
+const RESID_VAR_B = (modelData as any).resid_var_b as number;
 
 export function MathPanel({ signals, composite }: Props) {
+  const linCombo = signals.reduce((acc, s) => acc + s.ridgeCoef * s.zVal, 0);
+
   return (
     <div className="two-col">
       <div className="chart-box">
-        <div className="chart-title"><span>v4 — PCA + walk-forward OLS audit</span></div>
+        <div className="chart-title"><span>v5.1 — Ridge regression · signal contributions</span></div>
         <table>
           <thead>
             <tr>
               <th>Signal</th>
-              <th>Value</th>
-              <th>Pctile</th>
-              <th>ρ 12m</th>
+              <th>z / RG</th>
+              <th>Coef</th>
+              <th>Contribution</th>
             </tr>
           </thead>
           <tbody>
-            {signals.map((s) => (
-              <tr key={s.key}>
-                <td>{s.label}</td>
-                <td>{s.value.toFixed(2)}</td>
-                <td className={s.rho12m < 0
-                  ? (s.pctile > 70 ? 'bear' : s.pctile > 50 ? 'warn' : 'bull')
-                  : (s.pctile < 30 ? 'bear' : s.pctile < 50 ? 'warn' : 'bull')}>
-                  {s.pctile.toFixed(0)}th
-                </td>
-                <td className={s.rho12m >= 0 ? 'bull' : 'bear'}>
-                  {s.rho12m >= 0 ? '+' : ''}{s.rho12m.toFixed(3)}
-                </td>
-              </tr>
-            ))}
+            {signals.map((s) => {
+              const contrib = s.ridgeCoef * s.zVal;
+              const col = contrib < -0.015 ? 'bear' : contrib < 0 ? 'warn' : contrib > 0.015 ? 'bull' : '';
+              return (
+                <tr key={s.key}>
+                  <td>{s.label}</td>
+                  <td>{s.zVal >= 0 ? '+' : ''}{s.zVal.toFixed(2)}</td>
+                  <td>{s.ridgeCoef >= 0 ? '+' : ''}{s.ridgeCoef.toFixed(4)}</td>
+                  <td className={col}>{contrib >= 0 ? '+' : ''}{(contrib * 100).toFixed(2)}pp</td>
+                </tr>
+              );
+            })}
+            <tr style={{ borderTop: '1px solid var(--border)' }}>
+              <td colSpan={3} style={{ color: 'var(--text2)' }}>Intercept</td>
+              <td>{INTERCEPT >= 0 ? '+' : ''}{(INTERCEPT * 100).toFixed(2)}pp</td>
+            </tr>
             <tr style={{ borderTop: '2px solid var(--border)', background: 'rgba(217,79,61,0.04)' }}>
-              <td style={{ fontWeight: 600, color: 'var(--text)' }} colSpan={3}>Composite Score</td>
-              <td style={{ fontWeight: 700, fontSize: 14, color: composite < 30 ? 'var(--bear)' : composite < 50 ? 'var(--warn)' : 'var(--bull,#4ade80)' }}>
+              <td style={{ fontWeight: 600, color: 'var(--text)' }} colSpan={2}>Ridge pred 12m</td>
+              <td colSpan={2} style={{ fontWeight: 700, fontSize: 14 }}>
+                {((INTERCEPT + linCombo) * 100).toFixed(2)}%
+              </td>
+            </tr>
+            <tr style={{ background: 'rgba(217,79,61,0.04)' }}>
+              <td style={{ fontWeight: 600, color: 'var(--text)' }} colSpan={2}>Composite Score</td>
+              <td colSpan={2} style={{ fontWeight: 700, fontSize: 14,
+                color: composite < 30 ? 'var(--bear)' : composite < 50 ? 'var(--warn)' : 'var(--bull,#4ade80)' }}>
                 {composite.toFixed(1)}
               </td>
             </tr>
@@ -56,35 +65,32 @@ export function MathPanel({ signals, composite }: Props) {
       </div>
 
       <div className="chart-box">
-        <div className="chart-title"><span>PCA loadings — how signals combine into PCs</span></div>
+        <div className="chart-title"><span>v5.1 model summary</span></div>
         <table>
           <thead>
             <tr>
-              <th>Signal</th>
-              <th>PC1 (55%)</th>
-              <th>PC2 (19%)</th>
-              <th>PC3 (11%)</th>
+              <th>Parameter</th>
+              <th>Value</th>
             </tr>
           </thead>
           <tbody>
-            {signals.map((s) => {
-              const [p1, p2, p3] = PC_LOADINGS[s.key] ?? [0, 0, 0];
-              return (
-                <tr key={s.key}>
-                  <td>{s.label}</td>
-                  <td style={{ color: Math.abs(p1) > 0.35 ? 'var(--text)' : 'var(--text3)' }}>{p1 >= 0 ? '+' : ''}{p1.toFixed(2)}</td>
-                  <td style={{ color: Math.abs(p2) > 0.35 ? 'var(--text)' : 'var(--text3)' }}>{p2 >= 0 ? '+' : ''}{p2.toFixed(2)}</td>
-                  <td style={{ color: Math.abs(p3) > 0.35 ? 'var(--text)' : 'var(--text3)' }}>{p3 >= 0 ? '+' : ''}{p3.toFixed(2)}</td>
-                </tr>
-              );
-            })}
+            <tr><td>Ridge α</td><td>{ALPHA}</td></tr>
+            <tr><td>Ridge intercept</td><td>{(INTERCEPT * 100).toFixed(2)}%</td></tr>
+            <tr><td>Drift (sample mean)</td><td>{(DRIFT * 100).toFixed(2)}%</td></tr>
+            <tr><td>OOS Spearman ρ</td><td>{OOS_RHO.toFixed(3)}</td></tr>
+            <tr><td>OOS n</td><td>{OOS_N} walk-forward predictions</td></tr>
+            <tr><td>σ² intercept (a)</td><td>{RESID_VAR_A.toFixed(5)}</td></tr>
+            <tr><td>σ² VIX slope (b)</td><td>{RESID_VAR_B >= 0 ? '+' : ''}{RESID_VAR_B.toFixed(5)}</td></tr>
           </tbody>
         </table>
 
         <div className="callout callout-info" style={{ marginTop: 16, fontSize: 11 }}>
-          <strong>v4 methodology:</strong> Z-score 7 signals → PCA (3 components, 85% variance) →
-          walk-forward OLS → percentile rank of predicted 12m return. OOS Spearman ρ=0.44, n=145 predictions.
-          OLS: pred = 0.119 − 0.032·PC1 − 0.029·PC2 − 0.067·PC3
+          <strong>v5.1 methodology:</strong> Z-score 5 signals (RSI, MFI, EMA dist, AAII, VIX);
+          rank-Gauss normalise 2 (PPI, margin debt) → Ridge regression (α={ALPHA}) on 7 features
+          → pred_fwd_12m = intercept + Σ coef·z → composite score = Φ((pred − drift) / σ(VIX)) × 100.
+          score=50 ⟺ pred equals historical drift ({(DRIFT*100).toFixed(1)}%).
+          Residual std is heteroscedastic: σ²(t) = max(floor, {RESID_VAR_A.toFixed(4)} + {RESID_VAR_B >= 0 ? '+' : ''}{RESID_VAR_B.toFixed(4)}·vix_z).
+          OOS Spearman ρ={OOS_RHO.toFixed(3)}, n={OOS_N}.
         </div>
       </div>
     </div>

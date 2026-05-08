@@ -62,7 +62,7 @@ export function scorePpi(data: PpiData): PpiSignal {
     yoy >= 2   ? 'Warm' :
     yoy >= 0   ? 'Target range' : 'Below target';
 
-  const accelLabel = accel > 0.1 ? ` +${accel.toFixed(1)}pp accel` : accel < -0.1 ? ` ${accel.toFixed(1)}pp deccel` : '';
+  const accelLabel = accel > 0.1 ? ` +${accel.toFixed(1)}pp accel` : accel < -0.1 ? ` ${accel.toFixed(1)}pp decel` : '';
   const raw = `${yoy.toFixed(2)}% YoY${accelLabel}`;
   const desc = `${zone} · 3m ann ${ann3m.toFixed(2)}%`;
 
