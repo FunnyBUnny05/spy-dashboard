@@ -1,7 +1,8 @@
-import { BucketDef } from '../lib/scoring';
+import { BucketDef, tteForScore } from '../lib/scoring';
 
 interface Props {
   bucket: BucketDef;
+  score: number;
 }
 
 function FwdRow({ label, value }: { label: string; value: number }) {
@@ -25,7 +26,17 @@ function FwdRow({ label, value }: { label: string; value: number }) {
   );
 }
 
-export function ForwardReturns({ bucket }: Props) {
+function fmtMonths(stat: { median: number | null; pctNever: number | null }) {
+  if (stat.median === null) return <span style={{ color: 'var(--text3)' }}>n/a</span>;
+  const m = Math.round(stat.median);
+  const tag = stat.pctNever && stat.pctNever >= 15
+    ? <span style={{ color: 'var(--text3)', fontWeight: 400 }}> ({Math.round(stat.pctNever)}% never)</span>
+    : null;
+  return <>{m}<span style={{ color: 'var(--text3)', fontSize: 10 }}>m</span>{tag}</>;
+}
+
+export function ForwardReturns({ bucket, score }: Props) {
+  const tte = tteForScore(score);
   return (
     <div className="card">
       <div className="stat-label">Fwd returns — this bucket (n={bucket.n})</div>
@@ -40,6 +51,29 @@ export function ForwardReturns({ bucket }: Props) {
         </span>
         <br />
         Worst case: <span className="bear">{(bucket.worst * 100).toFixed(1)}%</span>
+      </div>
+
+      <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border2)', fontSize: 11, lineHeight: 1.55 }}>
+        <div style={{ color: 'var(--text2)', marginBottom: 6, letterSpacing: 0.5, textTransform: 'uppercase', fontSize: 10 }}>
+          Median months until next…
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', columnGap: 4, rowGap: 2, fontSize: 11 }}>
+          <div style={{ color: 'var(--text3)' }}>−5%</div>
+          <div style={{ color: 'var(--text3)' }}>−10%</div>
+          <div style={{ color: 'var(--text3)' }}>−15%</div>
+          <div className="bear" style={{ fontWeight: 600 }}>{fmtMonths(tte.dd['5'])}</div>
+          <div className="bear" style={{ fontWeight: 600 }}>{fmtMonths(tte.dd['10'])}</div>
+          <div className="bear" style={{ fontWeight: 600 }}>{fmtMonths(tte.dd['15'])}</div>
+          <div style={{ color: 'var(--text3)', marginTop: 4 }}>+5%</div>
+          <div style={{ color: 'var(--text3)', marginTop: 4 }}>+10%</div>
+          <div style={{ color: 'var(--text3)', marginTop: 4 }}>+20%</div>
+          <div className="bull" style={{ fontWeight: 600 }}>{fmtMonths(tte.rally['5'])}</div>
+          <div className="bull" style={{ fontWeight: 600 }}>{fmtMonths(tte.rally['10'])}</div>
+          <div className="bull" style={{ fontWeight: 600 }}>{fmtMonths(tte.rally['20'])}</div>
+        </div>
+        <div style={{ color: 'var(--text3)', marginTop: 6, fontSize: 10 }}>
+          Historical median (lookahead 36m, n={tte.n}). Drawdown measured from running peak.
+        </div>
       </div>
     </div>
   );

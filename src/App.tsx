@@ -134,7 +134,7 @@ export default function App() {
             asOf={asOf}
             signalCount={7}
           />
-          <ForwardReturns bucket={result.bucket} />
+          <ForwardReturns bucket={result.bucket} score={result.compositeScore} />
           <AAIICard aaii={aaii} />
           <ExposureCard stance={result.stance} prevExposure="20-40% (v5.1)" composite={result.compositeScore} />
         </div>

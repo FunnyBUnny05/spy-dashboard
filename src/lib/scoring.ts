@@ -25,6 +25,7 @@
 
 import modelData from '../data/model.json';
 import aaiiData  from '../data/aaii.json';
+import tteData   from '../data/time_to_event.json';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -300,6 +301,40 @@ export const BUCKETS: BucketDef[] = (modelData as any).buckets.map((b: any) => (
 
 export function bucketFor(score: number): BucketDef {
   return BUCKETS.find(b => score >= b.lo && score < b.hi + 0.01) ?? BUCKETS[BUCKETS.length - 1];
+}
+
+// ── Time-to-event (historical median months until SPY moved by ±X%) ──────────
+
+export interface TTEStat {
+  median: number | null;
+  mean:   number | null;
+  pctNever: number | null;
+  nObserved: number;
+}
+
+export interface TTEBucket {
+  label: string;
+  lo: number;
+  hi: number;
+  n: number;
+  dd:    Record<string, TTEStat>;   // key = "5", "10", "15"
+  rally: Record<string, TTEStat>;   // key = "5", "10", "20"
+}
+
+export const TIME_TO_EVENT = {
+  lookaheadMonths:   (tteData as any).lookahead_months as number,
+  ddThresholds:      (tteData as any).dd_thresholds    as number[],
+  rallyThresholds:   (tteData as any).rally_thresholds as number[],
+  buckets: ((tteData as any).buckets as any[]).map((b): TTEBucket => ({
+    label: b.label, lo: b.lo, hi: b.hi, n: b.n,
+    dd:    b.dd,
+    rally: b.rally,
+  })),
+};
+
+export function tteForScore(score: number): TTEBucket {
+  const idx = Math.min(4, Math.floor(score / 20));
+  return TIME_TO_EVENT.buckets[idx];
 }
 
 // ── Stance ────────────────────────────────────────────────────────────────────

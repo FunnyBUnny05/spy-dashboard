@@ -440,3 +440,11 @@ with open(MFILE, 'w') as f:
 
 print(f"\n✅ model.json updated at {MFILE}")
 print(f"   alpha={final_alpha}  drift={DRIFT:.4f}  rho={rho:.4f}  resid_std={resid_std:.4f}")
+
+# Regenerate the time-to-event table so the UI's "median months until next ±X%"
+# stays in sync with the freshly-saved walk-forward scores.
+try:
+    import subprocess
+    subprocess.check_call(['python3', str(REPO / 'scripts/time_to_event.py')])
+except Exception as e:
+    print(f"  ⚠ time_to_event.py regen failed: {e} (run it manually)")
