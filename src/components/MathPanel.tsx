@@ -20,7 +20,7 @@ export function MathPanel({ signals, composite }: Props) {
   return (
     <div className="two-col">
       <div className="chart-box">
-        <div className="chart-title"><span>v5.1 — Ridge regression · signal contributions</span></div>
+        <div className="chart-title"><span>v5.2 — Ridge regression · signal contributions</span></div>
         <table>
           <thead>
             <tr>
@@ -65,7 +65,7 @@ export function MathPanel({ signals, composite }: Props) {
       </div>
 
       <div className="chart-box">
-        <div className="chart-title"><span>v5.1 model summary</span></div>
+        <div className="chart-title"><span>v5.2 model summary</span></div>
         <table>
           <thead>
             <tr>
@@ -85,8 +85,8 @@ export function MathPanel({ signals, composite }: Props) {
         </table>
 
         <div className="callout callout-info" style={{ marginTop: 16, fontSize: 11 }}>
-          <strong>v5.1 methodology:</strong> Z-score 5 signals (RSI, MFI, EMA dist, AAII, VIX);
-          rank-Gauss normalise 2 (PPI, margin debt) → Ridge regression (α={ALPHA}) on 7 features
+          <strong>v5.2 methodology:</strong> Rank-Gauss normalise all 7 signals (RSI, MFI, EMA dist, PPI, Margin Debt, AAII, VIX)
+          → Ridge regression (α={ALPHA}) on 7 features
           → pred_fwd_12m = intercept + Σ coef·z → composite score = Φ((pred − drift) / σ(VIX)) × 100.
           score=50 ⟺ pred equals historical drift ({(DRIFT*100).toFixed(1)}%).
           Residual std is heteroscedastic: σ²(t) = max(floor, {RESID_VAR_A.toFixed(4)} + {RESID_VAR_B >= 0 ? '+' : ''}{RESID_VAR_B.toFixed(4)}·vix_z).

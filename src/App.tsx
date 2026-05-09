@@ -136,7 +136,7 @@ export default function App() {
           />
           <ForwardReturns bucket={result.bucket} />
           <AAIICard aaii={aaii} />
-          <ExposureCard stance={result.stance} prevExposure="20-40% (v3)" composite={result.compositeScore} />
+          <ExposureCard stance={result.stance} prevExposure="20-40% (v5.1)" composite={result.compositeScore} />
         </div>
 
         {/* 7-SIGNAL GRID */}

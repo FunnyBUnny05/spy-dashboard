@@ -20,7 +20,7 @@ export function BucketsPanel({ currentBucket, predFwd12m, pi80Lo, pi80Hi, pi95Lo
       <div>
         <div className="chart-box">
           <div className="chart-title">
-            <span>Walk-forward Ridge forecast (v5.1, n=120)</span>
+            <span>Walk-forward Ridge forecast (v5.2, n=120)</span>
             <span style={{ color: 'var(--text3)', fontSize: 10 }}>quintile buckets · Newey-West HAC CI · 80/95% PI scaled by VIX</span>
           </div>
 
@@ -106,7 +106,7 @@ export function BucketsPanel({ currentBucket, predFwd12m, pi80Lo, pi80Hi, pi95Lo
         </div>
         <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 6, lineHeight: 1.45 }}>
           <strong>*</strong> Sparse buckets (n &lt; 5): the model rarely emits scores at the extremes
-          under the v5.1 ridge shrinkage (α=100), so Q1 and Q5 may be thinly populated or empty.
+          under the v5.2 ridge shrinkage (α=100), so Q1 and Q5 may be thinly populated or empty.
           This is a property of the prediction distribution, not a fixable defect.
         </div>
       </div>
@@ -141,7 +141,7 @@ export function BucketsPanel({ currentBucket, predFwd12m, pi80Lo, pi80Hi, pi95Lo
           })}
         </div>
         <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 12 }}>
-          v5.1 Ridge · OOS Spearman ρ = 0.36 · residual std = 12.6% · α=100 (re-tuned)
+          v5.2 Ridge · OOS Spearman ρ = 0.428 · residual std = 12.6% · α=100 (rank-Gauss all signals)
         </div>
       </div>
     </div>
