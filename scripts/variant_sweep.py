@@ -13,16 +13,17 @@ from sklearn.linear_model import Ridge, RidgeCV
 from sklearn.model_selection import TimeSeriesSplit
 
 CSV       = Path("/tmp/velv/master_dataset.csv")
-SIGNALS   = ['rsi_14m', 'mfi_14m', 'ema_dist_pct', 'ppi_yoy', 'mdebt_yoy', 'aaii_spread', 'vix_close']
+SIGNALS   = ['rsi_14m', 'mfi_14m', 'ema_dist_pct', 'ppi_yoy', 'mdebt_yoy', 'aaii_spread', 'vix_close',
+             'yield_curve_10y3m', 'breadth_12m_chg']
 ALPHAS    = [0.01, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0]
 ALPHAS_EXTENDED = ALPHAS + [200.0, 500.0]
 MIN_TRAIN = 36
 HORIZON   = 12
 
 UNIVARIATE_SIGN = {
-    'rsi_14m':      -1, 'mfi_14m':      -1, 'ema_dist_pct': -1,
-    'ppi_yoy':      -1, 'mdebt_yoy':    -1, 'aaii_spread':  -1,
-    'vix_close':    +1,
+    'rsi_14m':           -1, 'mfi_14m':      -1, 'ema_dist_pct':    -1,
+    'ppi_yoy':           -1, 'mdebt_yoy':    -1, 'aaii_spread':      -1,
+    'vix_close':         +1, 'yield_curve_10y3m': -1, 'breadth_12m_chg': -1,
 }
 
 df = pd.read_csv(CSV, parse_dates=['date'])

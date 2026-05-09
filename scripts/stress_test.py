@@ -1,4 +1,4 @@
-"""Synthetic stress tests for the v5.2 SPY composite indicator.
+"""Synthetic stress tests for the v5.5 SPY composite indicator.
 
 Defines canonical market regimes (late-cycle euphoria, deep capitulation,
 mid-cycle steady, stagflation alarm) and asserts the composite score lands
@@ -26,7 +26,7 @@ def case(name, raw, expected_score_range, narrative):
 def section(title):
     print(f'\n=== {title} ===')
 
-print('SPY composite v5.2 — synthetic regime stress tests')
+print('SPY composite v5.5 — synthetic regime stress tests')
 print(f'(model drift = {DRIFT*100:+.2f}%, score=50 ⇔ pred=drift)\n')
 
 results = []
@@ -103,7 +103,9 @@ section('6. Sign-direction (perturb one signal from mean)')
 base = dict(rsi14m=MEANS['rsi_14m'], mfi14m=MEANS['mfi_14m'],
             ema_dist_pct=MEANS['ema_dist_pct'], ppi_yoy=MEANS['ppi_yoy'],
             mdebt_yoy=MEANS['mdebt_yoy'], aaii_spread=MEANS['aaii_spread'],
-            vix_close=MEANS['vix_close'])
+            vix_close=MEANS['vix_close'],
+            yield_curve_10y3m=MEANS.get('yield_curve_10y3m', 0.0),
+            breadth_12m_chg=MEANS.get('breadth_12m_chg', 0.0))
 base_score = score(**base)['composite']
 
 def perturb(name, **overrides):
@@ -131,6 +133,9 @@ results.append(dir_test('PPI YoY 0% (deflation)',   +1, ppi_yoy=0.0))
 results.append(dir_test('AAII 0.55 (crowded long)', -1, aaii_spread=0.55))
 results.append(dir_test('AAII 0.40 (retail fear)',  +1, aaii_spread=0.40))
 results.append(dir_test('VIX 50 (panic)',           +1, vix_close=50))
+# v5.5 new signals: coef sign=-1 for both (high spread / high breadth outperformance → bearish)
+results.append(dir_test('Yield curve +2.5 (steep)', -1, yield_curve_10y3m=2.5))
+results.append(dir_test('Breadth +10% (eq-wt leads)', -1, breadth_12m_chg=10.0))
 
 # v5.3 sanity: the sign-constrained ridge auto-prunes redundant signals
 # (mfi_14m, ema_dist_pct, mdebt_yoy) by zeroing their coefficients. We

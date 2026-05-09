@@ -1,5 +1,5 @@
 /**
- * SPY Composite Scoring System v5.4
+ * SPY Composite Scoring System v5.5
  *
  * Model: SIGN-CONSTRAINED Ridge regression on rank-Gauss-normalised signals,
  * with VIX excluded from predictors (kept in data for σ_t and UI percentiles).
@@ -8,19 +8,21 @@
  *   v5.2: Free Ridge + RG all 7. OOS ρ = 0.428.
  *   v5.3: Sign-constrained Ridge α=5 (auto-prunes MFI/EMA-dist/MDebt). ρ = 0.560.
  *   v5.4: Drop VIX from predictors (audit showed it harmed ρ).         ρ = 0.598.
+ *   v5.5: Add yield curve (10Y−3m) + breadth (RSP/SPY 12m chg).        ρ = 0.641.
  *
- * Effective model uses 3 active signals: RSI, PPI, AAII spread.
- * Quintile spread Q5−Q1: +24.0pp.  Quintile monotonicity preserved.
+ * Effective model uses 5 active signals: RSI, PPI, AAII spread,
+ * yield curve 10Y−3m, breadth 12m chg.
+ * Quintile spread Q5−Q1: +18.8pp.  Quintile monotonicity preserved.
  *
  * Pipeline:
- *   1. 7 input signals
+ *   1. 9 input signals
  *   2. Rank-Gauss every signal against the full-sample sorted reference
  *   3. pred_fwd_12m = intercept + Σ ridge_coef_k * rg_k
- *      (3 of the 7 ridge_coefs are exactly 0 by sign-constraint)
+ *      (4 of the 9 ridge_coefs are exactly 0 by sign-constraint)
  *   4. Composite score = norm.cdf((pred − drift) / σ(VIX)) × 100
  *      where drift = full-sample mean fwd_12m, σ(VIX) is heteroscedastic
  *      σ²(t) = max(floor, a + b·vix_z(t)). score=50 ⇔ pred = drift.
- *   5. Empirical historical percentiles for all 7 signals.
+ *   5. Empirical historical percentiles for all 9 signals.
  */
 
 import modelData from '../data/model.json';
@@ -29,7 +31,7 @@ import tteData   from '../data/time_to_event.json';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type SignalKey = 'rsi' | 'mfi' | 'trend' | 'ppi' | 'mdebt' | 'aaii' | 'vix';
+export type SignalKey = 'rsi' | 'mfi' | 'trend' | 'ppi' | 'mdebt' | 'aaii' | 'vix' | 'yieldcurve' | 'breadth';
 
 export interface SignalSpec {
   key: SignalKey;
@@ -106,18 +108,21 @@ function rgRefFor(sk: string): number[] {
 const SIGNAL_SORTED = ((modelData as any).signal_sorted ?? {}) as Record<string, number[]>;
 
 const SIGNAL_META: Record<string, { label: string; category: string; rho12m: number }> = {
-  rsi_14m:     { label: 'RSI (14m)',           category: 'Momentum',          rho12m: -0.523 },
-  mfi_14m:     { label: 'MFI (14m)',           category: 'Volume momentum',   rho12m: -0.341 },
-  ema_dist_pct:{ label: 'EMA-12m dist %',      category: 'Trend',             rho12m: -0.213 },
-  ppi_yoy:     { label: 'PPI YoY %',           category: 'Inflation',         rho12m: -0.318 },
-  mdebt_yoy:   { label: 'Margin debt YoY %',   category: 'Leverage',          rho12m: -0.226 },
-  aaii_spread: { label: 'AAII stocks−cash',    category: 'Retail sentiment',  rho12m: -0.607 },
-  vix_close:   { label: 'VIX',                 category: 'Volatility / fear', rho12m: +0.267 },
+  rsi_14m:           { label: 'RSI (14m)',             category: 'Momentum',          rho12m: -0.523 },
+  mfi_14m:           { label: 'MFI (14m)',             category: 'Volume momentum',   rho12m: -0.341 },
+  ema_dist_pct:      { label: 'EMA-12m dist %',        category: 'Trend',             rho12m: -0.213 },
+  ppi_yoy:           { label: 'PPI YoY %',             category: 'Inflation',         rho12m: -0.318 },
+  mdebt_yoy:         { label: 'Margin debt YoY %',     category: 'Leverage',          rho12m: -0.226 },
+  aaii_spread:       { label: 'AAII stocks−cash',      category: 'Retail sentiment',  rho12m: -0.607 },
+  vix_close:         { label: 'VIX',                   category: 'Volatility / fear', rho12m: +0.267 },
+  yield_curve_10y3m: { label: 'Yield curve 10Y−3m',   category: 'Macro / rates',     rho12m: -0.380 },
+  breadth_12m_chg:   { label: 'Breadth (RSP/SPY 12m)', category: 'Market breadth',    rho12m: -0.350 },
 };
 
 const SIGNAL_KEY_MAP: Record<string, SignalKey> = {
   rsi_14m: 'rsi', mfi_14m: 'mfi', ema_dist_pct: 'trend',
   ppi_yoy: 'ppi', mdebt_yoy: 'mdebt', aaii_spread: 'aaii', vix_close: 'vix',
+  yield_curve_10y3m: 'yieldcurve', breadth_12m_chg: 'breadth',
 };
 
 // ── Utility ───────────────────────────────────────────────────────────────────
@@ -208,18 +213,21 @@ function getSorted(sigKey: string): number[] {
 // ── Core model computation ────────────────────────────────────────────────────
 
 export interface RawSignalValues {
-  rsi14m:     number;
-  mfi14m:     number;
-  emaDistPct: number;
-  ppiYoy:     number;
-  mdebtYoy:   number;
-  aaiiSpread: number;
-  vixClose:   number;
+  rsi14m:          number;
+  mfi14m:          number;
+  emaDistPct:      number;
+  ppiYoy:          number;
+  mdebtYoy:        number;
+  aaiiSpread:      number;
+  vixClose:        number;
+  yieldCurve10y3m: number;
+  breadth12mChg:   number;
 }
 
 const RAW_TO_MODEL: Record<keyof RawSignalValues, string> = {
   rsi14m: 'rsi_14m', mfi14m: 'mfi_14m', emaDistPct: 'ema_dist_pct',
   ppiYoy: 'ppi_yoy', mdebtYoy: 'mdebt_yoy', aaiiSpread: 'aaii_spread', vixClose: 'vix_close',
+  yieldCurve10y3m: 'yield_curve_10y3m', breadth12mChg: 'breadth_12m_chg',
 };
 
 export function computeV2(raw: RawSignalValues): V5Result {
