@@ -1,17 +1,24 @@
 """
-fit_ridge.py  —  SPY Dashboard v5.3 model fitter
+fit_ridge.py  —  SPY Dashboard v5.4 model fitter
 -------------------------------------------------
-v5.3: SIGN-CONSTRAINED RIDGE on rank-Gauss-normalised signals.
+v5.4: SIGN-CONSTRAINED RIDGE on rank-Gauss-normalised signals,
+with VIX excluded from the predictor set (kept in data for UI
+percentiles + heteroscedastic σ_t).
 
-The constraint forces each coefficient to share the sign of its
-univariate correlation with fwd_12m, which automatically prunes
-multicollinear signals (MFI, EMA dist, MDebt) whose unconstrained
-ridge coefficients had near-zero or sign-flipped values. The result
-is a self-pruning 4-signal model (RSI, PPI, AAII, VIX) that is more
-robust and substantially more accurate out-of-sample.
+Why drop VIX? Leave-one-signal-out audit (scripts/full_audit.py)
+showed that removing VIX improves OOS ρ from 0.560 → 0.598 and
+reduces MAE from 9.8% → 9.5%. VIX has a positive univariate ρ with
+fwd_12m (+0.27) but the signal is heavily concentrated in 2008/2020
+extreme spikes — outside those events VIX adds noise. AAII spread
+already captures sentiment more stably.
 
-OOS Spearman ρ:  0.428 (v5.2) → 0.562 (v5.3)   [+31% relative]
-Quintile spread Q5−Q1: +18.7pp → +21.7pp        [+3pp]
+The sign constraint then auto-prunes 3 more redundant signals (MFI,
+EMA dist, Margin Debt). Effective model uses 3 active signals:
+RSI, PPI, AAII spread.
+
+OOS Spearman ρ:    0.428 (v5.2) → 0.562 (v5.3) → 0.598 (v5.4)
+                                                 [+40% vs v5.2]
+Quintile spread Q5−Q1: +18.7pp → +21.7pp → +24.0pp
 Quintile monotonicity preserved.
 
 Other features carried from v5.1:
@@ -48,12 +55,16 @@ MFILE = REPO / "src/data/model.json"
 
 SIGNALS = ['rsi_14m', 'mfi_14m', 'ema_dist_pct', 'ppi_yoy', 'mdebt_yoy', 'aaii_spread', 'vix_close']
 RANK_GAUSS_SIGNALS = set(SIGNALS)
-# Univariate sign of each signal vs fwd_12m. Computed from full-sample
-# correlations; used as a constraint on the ridge coefficients.
+# Predictors used in the ridge fit. v5.4 excludes vix_close: full_audit.py
+# proved it harms OOS ρ. VIX stays in SIGNALS so the UI still shows its
+# percentile card and σ_t (heteroscedastic residual) still scales by VIX.
+PREDICTORS = [s for s in SIGNALS if s != 'vix_close']
+# Univariate sign of each predictor vs fwd_12m. Used as a coefficient
+# constraint in the ridge fit.
 UNIVARIATE_SIGN = {
     'rsi_14m':      -1, 'mfi_14m':      -1, 'ema_dist_pct': -1,
     'ppi_yoy':      -1, 'mdebt_yoy':    -1, 'aaii_spread':  -1,
-    'vix_close':    +1,
+    # vix_close intentionally absent from PREDICTORS, so no entry here
 }
 FIXED_ALPHA = 5.0   # OOS-validated; surface is flat across α∈[1,10]
 ALPHAS  = [FIXED_ALPHA]   # kept as a list for downstream code that iterates
@@ -102,11 +113,14 @@ def rank_gauss_series(vals: np.ndarray, ref_sorted: np.ndarray) -> np.ndarray:
 def rank_gauss_one(value: float, ref_sorted: np.ndarray) -> float:
     return float(rank_gauss_series(np.array([value]), ref_sorted)[0])
 
-ppi_col   = SIGNALS.index('ppi_yoy')
-mdebt_col = SIGNALS.index('mdebt_yoy')
-vix_col   = SIGNALS.index('vix_close')
+ppi_col   = PREDICTORS.index('ppi_yoy')
+mdebt_col = PREDICTORS.index('mdebt_yoy')
+# vix_col references the FULL SIGNALS list (for heteroscedastic σ_t)
+vix_col_in_signals = SIGNALS.index('vix_close')
 
-RG_COLS = [SIGNALS.index(s) for s in SIGNALS if s in RANK_GAUSS_SIGNALS]
+# Rank-Gauss applies to every PREDICTOR column; we index into the predictor
+# matrix directly.
+RG_COLS = list(range(len(PREDICTORS)))
 
 def standardize(X_train, means, stds, sorted_arrs):
     """Apply z-score then overwrite RG columns with rank-Gauss."""
@@ -140,8 +154,10 @@ for idx in range(len(df)):
     if len(train) < MIN_TRAIN:
         continue
 
-    X_train = train[SIGNALS].values.astype(float)
+    X_train = train[PREDICTORS].values.astype(float)
     y_train = train['fwd_12m'].values.astype(float)
+    train_vix = train['vix_close'].values.astype(float)
+    test_vix_raw = float(row['vix_close'])
 
     means = X_train.mean(axis=0)
     stds  = X_train.std(axis=0, ddof=1)
@@ -150,20 +166,20 @@ for idx in range(len(df)):
     sorted_arrs = {c: np.sort(X_train[:, c]) for c in RG_COLS}
     X_z = standardize(X_train, means, stds, sorted_arrs)
 
-    # v5.3: fixed α with sign constraints — OOS-validated as the best
-    # operating point on this data. CV was over-shrinking.
-    signs = np.array([UNIVARIATE_SIGN[s] for s in SIGNALS])
+    # v5.4: fixed α=5 with sign constraints. VIX excluded from PREDICTORS
+    # (audit showed VIX hurts OOS ρ). Heteroscedastic σ_t still uses VIX.
+    signs = np.array([UNIVARIATE_SIGN[s] for s in PREDICTORS])
     best_alpha = FIXED_ALPHA
     beta_w, intercept_w = fit_ridge_with_sign(X_z, y_train, best_alpha, signs)
 
-    test_raw = row[SIGNALS].values.astype(float)
+    test_raw = row[PREDICTORS].values.astype(float)
     test_z   = standardize_one(test_raw, means, stds, sorted_arrs)
 
     pred = float(intercept_w + test_z @ beta_w)
     oos_preds.append(pred)
     oos_actual.append(float(row['fwd_12m']))
     oos_dates.append(row['date'])
-    oos_vix_raw.append(float(test_raw[vix_col]))
+    oos_vix_raw.append(test_vix_raw)
     oos_drifts.append(float(np.mean(y_train)))   # training-sample drift
 
 oos_preds   = np.array(oos_preds)
@@ -182,32 +198,44 @@ print(f"OOS MAE          = {mae:.4f}")
 
 # ── final model on ALL data ───────────────────────────────────────────────────
 all_valid = df.dropna(subset=['fwd_12m'])
-X_all = all_valid[SIGNALS].values.astype(float)
+X_all = all_valid[PREDICTORS].values.astype(float)
 y_all = all_valid['fwd_12m'].values.astype(float)
+X_all_full = all_valid[SIGNALS].values.astype(float)   # for VIX/sorted refs of all 7
 
-final_means = X_all.mean(axis=0)
+final_means = X_all.mean(axis=0)            # over PREDICTORS (used for ridge fit)
 final_stds  = X_all.std(axis=0, ddof=1)
 final_stds[final_stds == 0] = 1.0
+
+# Full-7 means/stds for the scoring.ts schema (UI z-scores VIX too even
+# though coef=0; harmless and keeps model.json shape stable).
+full_means = X_all_full.mean(axis=0)
+full_stds  = X_all_full.std(axis=0, ddof=1); full_stds[full_stds == 0] = 1.0
 
 sorted_final = {c: np.sort(X_all[:, c]) for c in RG_COLS}
 ppi_sorted_final   = sorted_final[ppi_col]      # kept for backward-compat output
 mdebt_sorted_final = sorted_final[mdebt_col]
 
+# Per-signal sorted arrays for ALL 7 signals (used by scoring.ts rank-gauss).
+sorted_full_by_name = {sk: np.sort(X_all_full[:, SIGNALS.index(sk)])
+                       for sk in SIGNALS}
+
 X_all_z = standardize(X_all, final_means, final_stds, sorted_final)
 
-# v5.3: sign-constrained ridge at fixed α (consistent with walk-forward).
+# v5.4: sign-constrained ridge at fixed α (consistent with walk-forward).
 final_alpha = FIXED_ALPHA
-final_signs = np.array([UNIVARIATE_SIGN[s] for s in SIGNALS])
+final_signs = np.array([UNIVARIATE_SIGN[s] for s in PREDICTORS])
 final_beta, final_intercept = fit_ridge_with_sign(X_all_z, y_all, final_alpha, final_signs)
 print(f"Final (full-sample) alpha (fixed): {final_alpha}")
 print(f"Final intercept = {final_intercept:+.6f}")
 n_zeroed = 0
-for sig, coef in zip(SIGNALS, final_beta):
+for sig, coef in zip(PREDICTORS, final_beta):
     flag = '  ←constraint binding (auto-pruned)' if abs(coef) < 1e-9 else ''
     if abs(coef) < 1e-9:
         n_zeroed += 1
     print(f"  {sig:20s}: {coef:+.6f}{flag}")
-print(f"  → {len(SIGNALS) - n_zeroed} active signals, {n_zeroed} pruned by sign constraint")
+print(f"  → {len(PREDICTORS) - n_zeroed} active predictors, "
+      f"{n_zeroed} pruned by sign constraint, "
+      f"{len(SIGNALS) - len(PREDICTORS)} excluded a priori (vix_close)")
 
 # Bridge object so downstream code that calls .predict / .intercept_ / .coef_
 # keeps working. This is a minimal shim — sklearn-compatible interface.
@@ -224,9 +252,10 @@ DRIFT = float(np.mean(y_all))
 print(f"\nDrift (sample mean of fwd_12m) = {DRIFT:.4f}  ({DRIFT*100:.2f}%)")
 
 # ── heteroscedastic residual variance: σ²(t) ≈ a + b·vix_z(t) ────────────────
-# Use training-sample VIX standardisation so coefficients are interpretable.
-vix_mean = float(np.mean(X_all[:, vix_col]))
-vix_std  = float(np.std(X_all[:, vix_col], ddof=1))
+# VIX is referenced from X_all_full (the FULL SIGNALS matrix), not from the
+# predictor matrix X_all (which excludes VIX in v5.4).
+vix_mean = float(np.mean(X_all_full[:, vix_col_in_signals]))
+vix_std  = float(np.std(X_all_full[:, vix_col_in_signals], ddof=1))
 oos_vix_z = (oos_vix_raw - vix_mean) / vix_std
 
 # Regress squared residuals on vix_z. Constrain fit to non-negative variance
@@ -341,11 +370,14 @@ for d in sorted(price_ts_map.keys()):
         entry['pred']  = score_map[d]['pred']
         entry['in_sample'] = False
     elif d in df_idx.index:
-        # Fitted score using the final full-data model
-        raw = df_idx.loc[d, SIGNALS].values.astype(float) if not isinstance(df_idx.loc[d], pd.DataFrame) else df_idx.loc[d].iloc[-1][SIGNALS].values.astype(float)
-        z = standardize_one(raw, final_means, final_stds, sorted_final)
+        # Fitted score using the final full-data model.
+        # Predictor matrix excludes VIX (v5.4); pull VIX separately for σ_t.
+        row_at_d = df_idx.loc[d] if not isinstance(df_idx.loc[d], pd.DataFrame) else df_idx.loc[d].iloc[-1]
+        raw_pred = row_at_d[PREDICTORS].values.astype(float)
+        raw_vix  = float(row_at_d['vix_close'])
+        z = standardize_one(raw_pred, final_means, final_stds, sorted_final)
         p = float(ridge_final.predict(z.reshape(1, -1))[0])
-        vz = (raw[vix_col] - vix_mean) / vix_std
+        vz = (raw_vix - vix_mean) / vix_std
         var_t = max(floor, resid_var_a + resid_var_b * vz)
         s = float(stats.norm.cdf((p - DRIFT) / np.sqrt(var_t)) * 100)
         entry['score'] = round(s, 2)
@@ -366,19 +398,25 @@ for sk in SIGNALS:
     signal_sorted[sk] = [round(float(v), 4) for v in arr]
 
 # ── write model.json ─────────────────────────────────────────────────────────
+# Build ridge_coefs dict over all 7 SIGNALS, with VIX=0 (excluded predictor).
+ridge_coefs_full = dict(zip(PREDICTORS, ridge_final.coef_))
+for sk in SIGNALS:
+    ridge_coefs_full.setdefault(sk, 0.0)
+
 model.update({
     'signals': SIGNALS,
-    'means':   {s: round(float(v), 6) for s, v in zip(SIGNALS, final_means)},
-    'stds':    {s: round(float(v), 6) for s, v in zip(SIGNALS, final_stds)},
+    'means':   {s: round(float(v), 6) for s, v in zip(SIGNALS, full_means)},
+    'stds':    {s: round(float(v), 6) for s, v in zip(SIGNALS, full_stds)},
+    'predictors':      PREDICTORS,   # v5.4: explicit predictor list
     'ridge_alpha':     final_alpha,
     'ridge_intercept': round(float(ridge_final.intercept_), 8),
-    'ridge_coefs':     {s: round(float(c), 8) for s, c in zip(SIGNALS, ridge_final.coef_)},
+    'ridge_coefs':     {s: round(float(ridge_coefs_full[s]), 8) for s in SIGNALS},
     'rank_gauss_ppi_sorted':   [round(float(v), 4) for v in ppi_sorted_final],
     'rank_gauss_mdebt_sorted': [round(float(v), 4) for v in mdebt_sorted_final],
-    # v5.2: rank-Gauss applied to ALL signals; per-signal sorted refs:
     'rank_gauss_signals': sorted(RANK_GAUSS_SIGNALS),
-    'rank_gauss_sorted': {SIGNALS[c]: [round(float(v), 4) for v in sorted_final[c]]
-                          for c in RG_COLS},
+    # Per-signal RG sorted refs — over all 7 signals so UI rank-gauss still works.
+    'rank_gauss_sorted': {sk: [round(float(v), 4) for v in sorted_full_by_name[sk]]
+                          for sk in SIGNALS},
     'signal_sorted':   signal_sorted,
     'resid_std':       round(resid_std, 8),
     'resid_var_a':     round(resid_var_a, 8),

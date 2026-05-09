@@ -19,8 +19,6 @@ ALPHAS_EXTENDED = ALPHAS + [200.0, 500.0]
 MIN_TRAIN = 36
 HORIZON   = 12
 
-# Univariate sign of each signal vs fwd_12m (computed from full-sample correlations
-# in scoring.ts; used for sign-constrained ridge).
 UNIVARIATE_SIGN = {
     'rsi_14m':      -1, 'mfi_14m':      -1, 'ema_dist_pct': -1,
     'ppi_yoy':      -1, 'mdebt_yoy':    -1, 'aaii_spread':  -1,
@@ -40,13 +38,6 @@ def rank_gauss_series(vals, ref_sorted):
 def fit_ridge_with_sign(X, y, alpha, signs):
     """Mean-centered ridge with sign constraints (matches sklearn's
     fit_intercept=True semantics). signs: array of +1/-1/0 per column.
-    Solved by coordinate descent on the centered Lagrangian:
-
-        argmin_β  ½‖y_c − X_c β‖² + (α/2)‖β‖²    s.t.  sign(β_j) ∈ {sign_j, 0}
-
-    The intercept is the standard `mean(y) − mean(X)·β` after solving on
-    centered data — exactly what sklearn does, and what makes this fair
-    against the unconstrained Ridge baseline.
     """
     Xc = X - X.mean(axis=0)
     yc = y - y.mean()
@@ -54,9 +45,7 @@ def fit_ridge_with_sign(X, y, alpha, signs):
     XTy = Xc.T @ yc
     XTX = Xc.T @ Xc + alpha * np.eye(p)
     diag = np.diag(XTX).copy()
-    # Warm-start from unconstrained solution on centered data
     beta = np.linalg.solve(XTX, XTy)
-    # Project + coord-descent
     for _ in range(500):
         prev = beta.copy()
         for j in range(p):
@@ -73,11 +62,9 @@ def fit_ridge_with_sign(X, y, alpha, signs):
 def run_variant(name, signal_list, rg_signals, alpha_grid, sign_constrain=False):
     """Walk-forward OOS evaluation. Returns metrics dict."""
     rg_set = set(rg_signals)
-    cols = [SIGNALS.index(s) for s in signal_list]
     rg_cols_local = [signal_list.index(s) for s in signal_list if s in rg_set]
 
-    oos_preds, oos_actual, oos_dates = [], [], []
-    oos_drifts = []
+    oos_preds, oos_actual = [], []
     chosen_alphas = []
 
     for idx in range(len(df)):
@@ -91,18 +78,14 @@ def run_variant(name, signal_list, rg_signals, alpha_grid, sign_constrain=False)
 
         X_train = train[signal_list].values.astype(float)
         y_train = train['fwd_12m'].values.astype(float)
-
         means = X_train.mean(axis=0)
-        stds  = X_train.std(axis=0, ddof=1)
-        stds[stds == 0] = 1.0
+        stds  = X_train.std(axis=0, ddof=1); stds[stds == 0] = 1.0
 
         sorted_arrs = {c: np.sort(X_train[:, c]) for c in rg_cols_local}
         X_z = (X_train - means) / stds
         for c in rg_cols_local:
             X_z[:, c] = rank_gauss_series(X_train[:, c], sorted_arrs[c])
 
-        # Tune alpha. If alpha_grid has just one entry, use it directly (fair
-        # fixed-α comparison). Otherwise use TimeSeriesSplit CV.
         if len(alpha_grid) == 1:
             best_alpha = alpha_grid[0]
         elif len(train) >= 48:
@@ -132,105 +115,67 @@ def run_variant(name, signal_list, rg_signals, alpha_grid, sign_constrain=False)
         pred = float(intercept + test_z @ beta)
         oos_preds.append(pred)
         oos_actual.append(float(row['fwd_12m']))
-        oos_dates.append(row['date'])
-        oos_drifts.append(float(np.mean(y_train)))
 
-    oos_preds   = np.array(oos_preds)
-    oos_actual  = np.array(oos_actual)
-    oos_drifts  = np.array(oos_drifts)
-
+    oos_preds  = np.array(oos_preds)
+    oos_actual = np.array(oos_actual)
     rho, _   = stats.spearmanr(oos_preds, oos_actual)
     mae      = float(np.mean(np.abs(oos_actual - oos_preds)))
     bias     = float(np.mean(oos_preds - oos_actual))
-
-    # Quintile monotonicity & spread
-    order = np.argsort(oos_preds)
-    quints = np.array_split(order, 5)
-    q_means = [float(np.mean(oos_actual[q])) for q in quints]
-    spread = q_means[-1] - q_means[0]
-    mono = all(q_means[i] <= q_means[i+1] + 0.005 for i in range(4))
-
+    order    = np.argsort(oos_preds)
+    quints   = np.array_split(order, 5)
+    q_means  = [float(np.mean(oos_actual[q])) for q in quints]
+    spread   = q_means[-1] - q_means[0]
+    mono     = all(q_means[i] <= q_means[i+1] + 0.005 for i in range(4))
     return {
-        'name': name,
-        'n':     len(oos_preds),
-        'rho':   float(rho),
-        'mae':   mae,
-        'bias':  bias,
-        'spread_q5_q1': spread,
-        'monotonic_quintile': mono,
+        'name': name, 'n': len(oos_preds),
+        'rho': float(rho), 'mae': mae, 'bias': bias,
+        'spread_q5_q1': spread, 'monotonic_quintile': mono,
         'q_means': q_means,
         'mean_alpha': float(np.mean(chosen_alphas)) if chosen_alphas else None,
     }
 
-# ── Variants ──────────────────────────────────────────────────────────────────
-variants = []
-
-# baseline = current v5.2
-variants.append(run_variant(
-    'v5.2 baseline (RG all 7, free α)', SIGNALS, SIGNALS, ALPHAS))
-
-# drop ema_dist
-variants.append(run_variant(
-    'drop ema_dist_pct (6 signals)',
-    [s for s in SIGNALS if s != 'ema_dist_pct'],
-    [s for s in SIGNALS if s != 'ema_dist_pct'],
-    ALPHAS))
-
-# drop ema_dist + mfi (smallest coefs)
-variants.append(run_variant(
-    'drop ema_dist + mfi (5 signals)',
-    [s for s in SIGNALS if s not in ('ema_dist_pct', 'mfi_14m')],
-    [s for s in SIGNALS if s not in ('ema_dist_pct', 'mfi_14m')],
-    ALPHAS))
-
-# drop ema_dist + mfi + mdebt
-variants.append(run_variant(
-    'drop ema_dist + mfi + mdebt (4 signals)',
-    [s for s in SIGNALS if s not in ('ema_dist_pct', 'mfi_14m', 'mdebt_yoy')],
-    [s for s in SIGNALS if s not in ('ema_dist_pct', 'mfi_14m', 'mdebt_yoy')],
-    ALPHAS))
-
-# higher alpha forced (extended grid that allows up to 500)
-variants.append(run_variant(
-    'all 7 signals, α extended [...500]', SIGNALS, SIGNALS,
-    ALPHAS_EXTENDED))
-
-# sign-constrained ridge
-variants.append(run_variant(
-    'all 7 signals, sign-constrained ridge', SIGNALS, SIGNALS,
-    ALPHAS, sign_constrain=True))
-
-# sign-constrained ridge with alpha=100 (more shrinkage)
-variants.append(run_variant(
-    'all 7 signals, sign-constrained, α=100', SIGNALS, SIGNALS,
-    [100.0], sign_constrain=True))
-
-# Fair α-scan: at each fixed α, compare unconstrained sklearn Ridge to
-# sign-constrained custom optimizer. Same training data, same CV step,
-# same standardisation — only the constraint differs.
-print('\n[fair α-scan: sklearn-Ridge vs sign-constrained @ same fixed α]')
-for fixed_alpha in [1.0, 5.0, 10.0, 50.0, 100.0]:
+if __name__ == '__main__':
+    variants = []
     variants.append(run_variant(
-        f'all 7 unconstrained, α={fixed_alpha:g}',
-        SIGNALS, SIGNALS, [fixed_alpha], sign_constrain=False))
+        'v5.2 baseline (RG all 7, free α)', SIGNALS, SIGNALS, ALPHAS))
     variants.append(run_variant(
-        f'all 7 sign-constrained, α={fixed_alpha:g}',
-        SIGNALS, SIGNALS, [fixed_alpha], sign_constrain=True))
+        'drop ema_dist_pct (6 signals)',
+        [s for s in SIGNALS if s != 'ema_dist_pct'],
+        [s for s in SIGNALS if s != 'ema_dist_pct'], ALPHAS))
+    variants.append(run_variant(
+        'drop ema_dist + mfi (5 signals)',
+        [s for s in SIGNALS if s not in ('ema_dist_pct', 'mfi_14m')],
+        [s for s in SIGNALS if s not in ('ema_dist_pct', 'mfi_14m')], ALPHAS))
+    variants.append(run_variant(
+        'drop ema_dist + mfi + mdebt (4 signals)',
+        [s for s in SIGNALS if s not in ('ema_dist_pct', 'mfi_14m', 'mdebt_yoy')],
+        [s for s in SIGNALS if s not in ('ema_dist_pct', 'mfi_14m', 'mdebt_yoy')], ALPHAS))
+    variants.append(run_variant(
+        'all 7 signals, α extended [...500]', SIGNALS, SIGNALS, ALPHAS_EXTENDED))
+    variants.append(run_variant(
+        'all 7 signals, sign-constrained ridge', SIGNALS, SIGNALS,
+        ALPHAS, sign_constrain=True))
+    variants.append(run_variant(
+        'all 7 signals, sign-constrained, α=100', SIGNALS, SIGNALS,
+        [100.0], sign_constrain=True))
+    print('\n[fair α-scan: sklearn-Ridge vs sign-constrained @ same fixed α]')
+    for fixed_alpha in [1.0, 5.0, 10.0, 50.0, 100.0]:
+        variants.append(run_variant(
+            f'all 7 unconstrained, α={fixed_alpha:g}',
+            SIGNALS, SIGNALS, [fixed_alpha], sign_constrain=False))
+        variants.append(run_variant(
+            f'all 7 sign-constrained, α={fixed_alpha:g}',
+            SIGNALS, SIGNALS, [fixed_alpha], sign_constrain=True))
 
-# ── Report ────────────────────────────────────────────────────────────────────
-print(f'\n{"variant":<48} {"n":>4} {"rho":>7} {"mae":>7} {"bias":>7} {"Q5−Q1":>7} {"mono?":>6}')
-print('-' * 96)
-for v in variants:
-    print(f'{v["name"]:<48} {v["n"]:>4} '
-          f'{v["rho"]:>+.4f} {v["mae"]:>.4f} {v["bias"]:>+.4f} '
-          f'{v["spread_q5_q1"]:>+.4f} {"YES" if v["monotonic_quintile"] else "no":>6}')
-
-best = max(variants, key=lambda v: v['rho'])
-print(f'\nBest by Spearman ρ: {best["name"]}  (ρ={best["rho"]:+.4f})')
-
-# Report quintile means for the top 3
-print('\nQuintile means (Q1→Q5) for the top 3 variants:')
-ranked = sorted(variants, key=lambda v: -v['rho'])[:3]
-for v in ranked:
-    qm = '  '.join(f'{m*100:+5.1f}%' for m in v['q_means'])
-    print(f'  {v["name"]:<48}  {qm}')
+    print(f'\n{"variant":<48} {"n":>4} {"rho":>7} {"mae":>7} {"bias":>7} {"Q5−Q1":>7} {"mono?":>6}')
+    print('-' * 96)
+    for v in variants:
+        print(f'{v["name"]:<48} {v["n"]:>4} '
+              f'{v["rho"]:>+.4f} {v["mae"]:>.4f} {v["bias"]:>+.4f} '
+              f'{v["spread_q5_q1"]:>+.4f} {"YES" if v["monotonic_quintile"] else "no":>6}')
+    best = max(variants, key=lambda v: v['rho'])
+    print(f'\nBest by Spearman ρ: {best["name"]}  (ρ={best["rho"]:+.4f})')
+    print('\nQuintile means (Q1→Q5) for the top 3 variants:')
+    for v in sorted(variants, key=lambda v: -v['rho'])[:3]:
+        qm = '  '.join(f'{m*100:+5.1f}%' for m in v['q_means'])
+        print(f'  {v["name"]:<48}  {qm}')

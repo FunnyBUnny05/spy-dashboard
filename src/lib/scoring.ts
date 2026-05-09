@@ -1,16 +1,16 @@
 /**
- * SPY Composite Scoring System v5.3
+ * SPY Composite Scoring System v5.4
  *
- * Model: SIGN-CONSTRAINED Ridge regression on rank-Gauss-normalised signals.
+ * Model: SIGN-CONSTRAINED Ridge regression on rank-Gauss-normalised signals,
+ * with VIX excluded from predictors (kept in data for σ_t and UI percentiles).
  *
- * v5.3 changes vs v5.2:
- *   • Coefficients constrained to share sign with each signal's univariate
- *     correlation with fwd_12m. The constraint auto-prunes redundant
- *     signals (MFI, EMA dist, Margin Debt) by zeroing their coefficients.
- *   • Fixed α=5 (RidgeCV was over-shrinking on this data).
- *   • OOS Spearman ρ: 0.428 → 0.560 (+31% relative).
- *   • Quintile spread Q5−Q1: +18.7pp → +21.7pp.
- *   • Effective model uses 4 active signals (RSI, PPI, AAII, VIX).
+ * Evolution:
+ *   v5.2: Free Ridge + RG all 7. OOS ρ = 0.428.
+ *   v5.3: Sign-constrained Ridge α=5 (auto-prunes MFI/EMA-dist/MDebt). ρ = 0.560.
+ *   v5.4: Drop VIX from predictors (audit showed it harmed ρ).         ρ = 0.598.
+ *
+ * Effective model uses 3 active signals: RSI, PPI, AAII spread.
+ * Quintile spread Q5−Q1: +24.0pp.  Quintile monotonicity preserved.
  *
  * Pipeline:
  *   1. 7 input signals

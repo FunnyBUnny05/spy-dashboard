@@ -20,7 +20,7 @@ export function MathPanel({ signals, composite }: Props) {
   return (
     <div className="two-col">
       <div className="chart-box">
-        <div className="chart-title"><span>v5.3 — Ridge regression · signal contributions</span></div>
+        <div className="chart-title"><span>v5.4 — Ridge regression · signal contributions</span></div>
         <table>
           <thead>
             <tr>
@@ -65,7 +65,7 @@ export function MathPanel({ signals, composite }: Props) {
       </div>
 
       <div className="chart-box">
-        <div className="chart-title"><span>v5.3 model summary</span></div>
+        <div className="chart-title"><span>v5.4 model summary</span></div>
         <table>
           <thead>
             <tr>
@@ -85,10 +85,10 @@ export function MathPanel({ signals, composite }: Props) {
         </table>
 
         <div className="callout callout-info" style={{ marginTop: 16, fontSize: 11 }}>
-          <strong>v5.3 methodology:</strong> Rank-Gauss normalise all 7 signals
-          → sign-constrained Ridge (α={ALPHA}, fixed) — coefficients forced to share sign with univariate ρ.
-          The constraint auto-prunes 3 redundant signals (MFI, EMA dist, Margin Debt) by zeroing them.
-          Effective model uses 4 active features
+          <strong>v5.4 methodology:</strong> Rank-Gauss normalise all 7 signals
+          → sign-constrained Ridge (α={ALPHA}, fixed) on 6 predictors (VIX excluded as a predictor since OOS audit showed it harms ρ; still used for σ_t).
+          Coefficients forced to share sign with univariate ρ; constraint auto-prunes 3 more redundant signals (MFI, EMA dist, Margin Debt).
+          Effective model uses 3 active features
           → pred_fwd_12m = intercept + Σ coef·z → composite score = Φ((pred − drift) / σ(VIX)) × 100.
           score=50 ⟺ pred equals historical drift ({(DRIFT*100).toFixed(1)}%).
           Residual std is heteroscedastic: σ²(t) = max(floor, {RESID_VAR_A.toFixed(4)} + {RESID_VAR_B >= 0 ? '+' : ''}{RESID_VAR_B.toFixed(4)}·vix_z).
