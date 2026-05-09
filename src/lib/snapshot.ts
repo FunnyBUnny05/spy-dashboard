@@ -1,29 +1,33 @@
 /**
- * Current snapshot — raw signal values for the v4 PCA+OLS model.
+ * Current snapshot — raw signal values for the v5.5 model.
  *
  * UPDATE MONTHLY:
- *   rsi14m     — from TradingView SPY weekly CSV (auto-computed when you drop CSV)
- *   mfi14m     — from TradingView SPY weekly CSV (auto-computed)
- *   emaDistPct — from TradingView SPY weekly CSV (auto-computed)
- *   ppiYoy     — live from stock-sentinel Vercel app (auto-fetched)
- *   mdebtYoy   — live from stock-sentinel Vercel app (auto-fetched)
- *   aaiiSpread — from aaii.json (run `npm run update-aaii`)
- *   vixClose   — MANUAL: check finance.yahoo.com/quote/^VIX or cboe.com
+ *   rsi14m          — from TradingView SPY weekly CSV (auto-computed when you drop CSV)
+ *   mfi14m          — from TradingView SPY weekly CSV (auto-computed)
+ *   emaDistPct      — from TradingView SPY weekly CSV (auto-computed)
+ *   ppiYoy          — live from stock-sentinel Vercel app (auto-fetched)
+ *   mdebtYoy        — live from stock-sentinel Vercel app (auto-fetched)
+ *   aaiiSpread      — from aaii.json (run `npm run update-aaii`)
+ *   vixClose        — MANUAL: check finance.yahoo.com/quote/^VIX or cboe.com
+ *   yieldCurve10y3m — MANUAL: ^TNX minus ^IRX (Yahoo Finance, month-end close)
+ *   breadth12mChg   — MANUAL: (RSP/SPY now) / (RSP/SPY 12m ago) − 1, in %
  *
- * Last updated: April 2026
+ * Last updated: May 2026
  */
 
 export interface RawSnapshot {
   asOf: string;
   spyPrice: number;
-  // v4 model inputs
-  rsi14m:     number;
-  mfi14m:     number;
-  emaDistPct: number;
-  ppiYoy:     number;
-  mdebtYoy:   number;
-  aaiiSpread: number;  // stocks% - cash% (e.g. 0.685 - 0.159 = 0.526)
-  vixClose:   number;  // ← MANUAL update each month
+  // v5.5 model inputs
+  rsi14m:          number;
+  mfi14m:          number;
+  emaDistPct:      number;
+  ppiYoy:          number;
+  mdebtYoy:        number;
+  aaiiSpread:      number;  // stocks% - cash% (e.g. 0.685 - 0.159 = 0.526)
+  vixClose:        number;  // ← MANUAL update each month
+  yieldCurve10y3m: number;  // ← MANUAL: 10Y Treasury yield − 3m Treasury yield (pct pts)
+  breadth12mChg:   number;  // ← MANUAL: RSP/SPY ratio 12m % change
   // Buffett kept for context (not in composite)
   buffettDetail: {
     ratio: number;
@@ -50,6 +54,10 @@ export const CURRENT: RawSnapshot = {
 
   // ← UPDATE MANUALLY each month (CBOE: cboe.com/tradable_products/vix)
   vixClose: 16.99,
+
+  // ← UPDATE MANUALLY each month
+  yieldCurve10y3m: 0.805,  // Apr 2026: ~4.41% (^TNX) − ~3.61% (^IRX)
+  breadth12mChg:  -6.70,   // Apr 2026: RSP/SPY 12m % change (cap-weight leading)
 
   buffettDetail: {
     ratio: 228,

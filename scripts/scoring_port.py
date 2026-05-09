@@ -68,16 +68,19 @@ def cond_resid_std(vix_close):
     v  = max(RESID_VAR_FLOOR, RESID_VAR_A + RESID_VAR_B * vz)
     return sqrt(v)
 
-def score(rsi14m, mfi14m, ema_dist_pct, ppi_yoy, mdebt_yoy, aaii_spread, vix_close):
-    """Run a single set of raw signals through the full v5.2 pipeline."""
+def score(rsi14m, mfi14m, ema_dist_pct, ppi_yoy, mdebt_yoy, aaii_spread, vix_close,
+          yield_curve_10y3m=None, breadth_12m_chg=None):
+    """Run a single set of raw signals through the full v5.5 pipeline."""
     raw = {
-        'rsi_14m':      rsi14m,
-        'mfi_14m':      mfi14m,
-        'ema_dist_pct': ema_dist_pct,
-        'ppi_yoy':      ppi_yoy,
-        'mdebt_yoy':    mdebt_yoy,
-        'aaii_spread':  aaii_spread,
-        'vix_close':    vix_close,
+        'rsi_14m':            rsi14m,
+        'mfi_14m':            mfi14m,
+        'ema_dist_pct':       ema_dist_pct,
+        'ppi_yoy':            ppi_yoy,
+        'mdebt_yoy':          mdebt_yoy,
+        'aaii_spread':        aaii_spread,
+        'vix_close':          vix_close,
+        'yield_curve_10y3m':  yield_curve_10y3m if yield_curve_10y3m is not None else MEANS.get('yield_curve_10y3m', 0.0),
+        'breadth_12m_chg':    breadth_12m_chg   if breadth_12m_chg   is not None else MEANS.get('breadth_12m_chg',   0.0),
     }
     z = {}
     pct = {}
@@ -110,6 +113,7 @@ if __name__ == '__main__':
     # Quick sanity smoke test using sample-mean inputs (should land near 50).
     r = score(MEANS['rsi_14m'], MEANS['mfi_14m'], MEANS['ema_dist_pct'],
               MEANS['ppi_yoy'], MEANS['mdebt_yoy'], MEANS['aaii_spread'],
-              MEANS['vix_close'])
+              MEANS['vix_close'],
+              MEANS.get('yield_curve_10y3m'), MEANS.get('breadth_12m_chg'))
     print(f'mean-input pred = {r["pred"]:+.4f}  drift = {DRIFT:+.4f}  '
           f'composite = {r["composite"]:.2f}')

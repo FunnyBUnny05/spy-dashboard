@@ -50,13 +50,15 @@ export default function App() {
 
   // Build raw signal inputs — live/csv override snapshot
   const rawInputs: RawSignalValues = useMemo(() => ({
-    rsi14m:     spySignals?.rsi14   ?? CURRENT.rsi14m,
-    mfi14m:     spySignals?.mfi14   ?? CURRENT.mfi14m,
-    emaDistPct: spySignals?.ema50w  ?? CURRENT.emaDistPct,
-    ppiYoy:     liveData?.ppi.latest.yoy          ?? CURRENT.ppiYoy,
-    mdebtYoy:   liveData?.margin.latest.yoy_growth ?? CURRENT.mdebtYoy,
-    aaiiSpread: aaii.spread,
-    vixClose:   liveData?.vix?.value ?? CURRENT.vixClose,
+    rsi14m:          spySignals?.rsi14   ?? CURRENT.rsi14m,
+    mfi14m:          spySignals?.mfi14   ?? CURRENT.mfi14m,
+    emaDistPct:      spySignals?.ema50w  ?? CURRENT.emaDistPct,
+    ppiYoy:          liveData?.ppi.latest.yoy          ?? CURRENT.ppiYoy,
+    mdebtYoy:        liveData?.margin.latest.yoy_growth ?? CURRENT.mdebtYoy,
+    aaiiSpread:      aaii.spread,
+    vixClose:        liveData?.vix?.value ?? CURRENT.vixClose,
+    yieldCurve10y3m: CURRENT.yieldCurve10y3m,  // manual monthly update
+    breadth12mChg:   CURRENT.breadth12mChg,     // manual monthly update
   }), [spySignals, liveData, aaii]);
 
   const result     = useMemo(() => computeV2(rawInputs), [rawInputs]);

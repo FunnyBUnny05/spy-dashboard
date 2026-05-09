@@ -1,9 +1,9 @@
 """
-fit_ridge.py  —  SPY Dashboard v5.4 model fitter
+fit_ridge.py  —  SPY Dashboard v5.5 model fitter
 -------------------------------------------------
-v5.4: SIGN-CONSTRAINED RIDGE on rank-Gauss-normalised signals,
-with VIX excluded from the predictor set (kept in data for UI
-percentiles + heteroscedastic σ_t).
+v5.5: adds yield_curve_10y3m (10Y-3m spread) and breadth_12m_chg
+(equal-weight vs cap-weight 12m relative return) as new predictors.
+Both cleared the empirical screen: ρ > 0.35***, max cross-corr ≤ 0.36.
 
 Why drop VIX? Leave-one-signal-out audit (scripts/full_audit.py)
 showed that removing VIX improves OOS ρ from 0.560 → 0.598 and
@@ -53,18 +53,22 @@ REPO  = Path(__file__).parent.parent
 CSV   = Path("/tmp/velv/master_dataset.csv")
 MFILE = REPO / "src/data/model.json"
 
-SIGNALS = ['rsi_14m', 'mfi_14m', 'ema_dist_pct', 'ppi_yoy', 'mdebt_yoy', 'aaii_spread', 'vix_close']
+SIGNALS = ['rsi_14m', 'mfi_14m', 'ema_dist_pct', 'ppi_yoy', 'mdebt_yoy', 'aaii_spread', 'vix_close',
+           'yield_curve_10y3m', 'breadth_12m_chg']
 RANK_GAUSS_SIGNALS = set(SIGNALS)
-# Predictors used in the ridge fit. v5.4 excludes vix_close: full_audit.py
-# proved it harms OOS ρ. VIX stays in SIGNALS so the UI still shows its
-# percentile card and σ_t (heteroscedastic residual) still scales by VIX.
+# Predictors used in the ridge fit. v5.5 excludes vix_close (proved harmful
+# in full_audit.py). VIX stays in SIGNALS for UI percentile + σ_t scaling.
+# v5.5 adds: yield_curve_10y3m (ρ=-0.422***) and breadth_12m_chg (ρ=-0.353***),
+# both independent from RSI/AAII/PPI (max cross-corr ≤ 0.36).
 PREDICTORS = [s for s in SIGNALS if s != 'vix_close']
 # Univariate sign of each predictor vs fwd_12m. Used as a coefficient
 # constraint in the ridge fit.
 UNIVARIATE_SIGN = {
-    'rsi_14m':      -1, 'mfi_14m':      -1, 'ema_dist_pct': -1,
-    'ppi_yoy':      -1, 'mdebt_yoy':    -1, 'aaii_spread':  -1,
-    # vix_close intentionally absent from PREDICTORS, so no entry here
+    'rsi_14m':           -1, 'mfi_14m':      -1, 'ema_dist_pct':    -1,
+    'ppi_yoy':           -1, 'mdebt_yoy':    -1, 'aaii_spread':      -1,
+    'yield_curve_10y3m': -1,   # steep curve → lower fwd returns in sample
+    'breadth_12m_chg':   -1,   # equal-wt outperforming → late-cycle signal
+    # vix_close intentionally absent from PREDICTORS
 }
 FIXED_ALPHA = 5.0   # OOS-validated; surface is flat across α∈[1,10]
 ALPHAS  = [FIXED_ALPHA]   # kept as a list for downstream code that iterates
