@@ -103,9 +103,9 @@ export default function App() {
       <UpdateBanner />
       <div className="header">
         <div className="header-left">
-          <h1>SPY COMPOSITE SCORING SYSTEM v5.1</h1>
+          <h1>SPY COMPOSITE SCORING SYSTEM v5.2</h1>
           <p>
-            Ridge regression · 7 signals · {asOf}
+            Ridge regression (rank-Gauss all signals) · 7 signals · {asOf}
             {' · '}
             <span className={liveStatus === 'ok' ? 'live-dot-ok' : liveStatus === 'error' ? 'live-dot-err' : 'live-dot-loading'}>
               {liveLabel}
@@ -133,7 +133,6 @@ export default function App() {
             score={result.compositeScore}
             asOf={asOf}
             signalCount={7}
-            delta={{ value: result.compositeScore - 29.1, vsLabel: 'vs v3 (29.1)' }}
           />
           <ForwardReturns bucket={result.bucket} />
           <AAIICard aaii={aaii} />
@@ -195,9 +194,9 @@ export default function App() {
       </div>
 
       <footer>
-        SPY Composite v5.1 · Ridge regression · {asOf} ·
+        SPY Composite v5.2 · Ridge regression (rank-Gauss all) · {asOf} ·
         Signals: RSI, MFI, EMA dist, PPI, Margin Debt, AAII, VIX ·
-        OOS ρ=0.364 · n=120 predictions · Not a forecast
+        OOS ρ=0.428 · n=120 predictions · Not a forecast
       </footer>
     </>
   );
