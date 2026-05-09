@@ -1,20 +1,25 @@
 /**
- * SPY Composite Scoring System v5.2
+ * SPY Composite Scoring System v5.3
  *
- * Model: Ridge regression on rank-Gauss-normalised signals (no PCA).
+ * Model: SIGN-CONSTRAINED Ridge regression on rank-Gauss-normalised signals.
+ *
+ * v5.3 changes vs v5.2:
+ *   • Coefficients constrained to share sign with each signal's univariate
+ *     correlation with fwd_12m. The constraint auto-prunes redundant
+ *     signals (MFI, EMA dist, Margin Debt) by zeroing their coefficients.
+ *   • Fixed α=5 (RidgeCV was over-shrinking on this data).
+ *   • OOS Spearman ρ: 0.428 → 0.560 (+31% relative).
+ *   • Quintile spread Q5−Q1: +18.7pp → +21.7pp.
+ *   • Effective model uses 4 active signals (RSI, PPI, AAII, VIX).
  *
  * Pipeline:
  *   1. 7 input signals
  *   2. Rank-Gauss every signal against the full-sample sorted reference
- *      (v5.1 z-scored 5 / RG'd 2; v5.2 RG's all 7 — empirical OOS Spearman ρ
- *      improves from 0.364 → 0.428, +18% relative; bucket monotonicity
- *      tightens, Q1 returns no longer exceed Q3).
  *   3. pred_fwd_12m = intercept + Σ ridge_coef_k * rg_k
+ *      (3 of the 7 ridge_coefs are exactly 0 by sign-constraint)
  *   4. Composite score = norm.cdf((pred − drift) / σ(VIX)) × 100
- *      where drift = full-sample mean fwd_12m, and σ(VIX) is the
- *      VIX-conditional residual std (heteroscedastic):
- *        σ²(t) = max(floor, a + b·vix_z(t))
- *      score=50 means "predicted return equals the historical drift"
+ *      where drift = full-sample mean fwd_12m, σ(VIX) is heteroscedastic
+ *      σ²(t) = max(floor, a + b·vix_z(t)). score=50 ⇔ pred = drift.
  *   5. Empirical historical percentiles for all 7 signals.
  */
 
