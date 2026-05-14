@@ -37,13 +37,15 @@ export default function App() {
   // Live data: PPI, margin debt, Buffett
   const [liveData, setLiveData] = useState<LiveData | null>(null);
   const [liveStatus, setLiveStatus] = useState<'loading' | 'ok' | 'error'>('loading');
+  const [refreshKey, setRefreshKey] = useState(0);
   useEffect(() => {
     let cancelled = false;
+    setLiveStatus('loading');
     fetchLiveData()
       .then(d  => { if (!cancelled) { setLiveData(d);  setLiveStatus('ok');    }})
       .catch(() => { if (!cancelled) setLiveStatus('error'); });
     return () => { cancelled = true; };
-  }, []);
+  }, [refreshKey]);
 
   // SPY CSV → replace RSI/MFI/trend signals
   const [spySignals, setSpySignals] = useState<SpySignals | null>(null);
@@ -112,6 +114,14 @@ export default function App() {
             <span className={liveStatus === 'ok' ? 'live-dot-ok' : liveStatus === 'error' ? 'live-dot-err' : 'live-dot-loading'}>
               {liveLabel}
             </span>
+            {' · '}
+            <button
+              onClick={() => setRefreshKey(k => k + 1)}
+              disabled={liveStatus === 'loading'}
+              style={{ background: 'none', border: '1px solid var(--text2)', borderRadius: 4, color: 'var(--text2)', cursor: liveStatus === 'loading' ? 'default' : 'pointer', fontSize: '0.75rem', padding: '1px 7px' }}
+            >
+              {liveStatus === 'loading' ? '⟳' : '↺ refresh'}
+            </button>
           </p>
         </div>
         <div className="header-badges">
