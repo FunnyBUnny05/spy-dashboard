@@ -40,12 +40,12 @@ export interface RawSnapshot {
 
 export const CURRENT: RawSnapshot = {
   asOf: 'May 2026',
-  spyPrice: 720.65,
+  spyPrice: 749.07,  // SPX 7490.73 / 10, week ending 2026-05-11
 
   // SPY-derived (auto-replaced when user drops TradingView CSV)
-  rsi14m:     70.21,
-  mfi14m:     66.70,
-  emaDistPct:  9.05,
+  rsi14m:     70.09,
+  mfi14m:     55.90,
+  emaDistPct: 12.52,
 
   // Live-fetched (auto-replaced on startup from stock-sentinel Vercel app)
   ppiYoy:    4.023,
