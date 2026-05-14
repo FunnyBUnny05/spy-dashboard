@@ -70,7 +70,7 @@ export function scorePpi(data: PpiData): PpiSignal {
 }
 
 export async function fetchPpi(): Promise<PpiSignal> {
-  const res = await fetch(`${BASE}/ppi_data.json`);
+  const res = await fetch(`${BASE}/ppi_data.json`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`PPI fetch failed: ${res.status}`);
   const data: PpiData = await res.json();
   return scorePpi(data);
@@ -126,7 +126,7 @@ export function scoreMarginDebt(data: MarginData): MarginSignal {
 }
 
 export async function fetchMarginDebt(): Promise<MarginSignal> {
-  const res = await fetch(`${BASE}/margin_data.json`);
+  const res = await fetch(`${BASE}/margin_data.json`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Margin debt fetch failed: ${res.status}`);
   const data: MarginData = await res.json();
   return scoreMarginDebt(data);
@@ -200,7 +200,7 @@ export function scoreBuffett(data: BuffettApiData): BuffettSignal {
 }
 
 export async function fetchBuffett(): Promise<BuffettSignal> {
-  const res = await fetch(`${BASE}/buffett_indicator_data.json`);
+  const res = await fetch(`${BASE}/buffett_indicator_data.json`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Buffett fetch failed: ${res.status}`);
   const data: BuffettApiData = await res.json();
   return scoreBuffett(data);
