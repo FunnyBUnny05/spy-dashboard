@@ -21,11 +21,12 @@ import { BucketsPanel }  from './components/BucketsPanel';
 import { HistoryPanel }  from './components/HistoryPanel';
 import { BuffettPanel }  from './components/BuffettPanel';
 import { AAIIPanel }     from './components/AAIIPanel';
-import { PlaybookPanel } from './components/PlaybookPanel';
-import { MathPanel }     from './components/MathPanel';
-import { UpdateBanner }  from './components/UpdateBanner';
+import { PlaybookPanel }  from './components/PlaybookPanel';
+import { MathPanel }      from './components/MathPanel';
+import { UpdateBanner }   from './components/UpdateBanner';
+import { StrategyPanel }  from './components/StrategyPanel';
 
-type TabId = 'buckets' | 'history' | 'buffett' | 'aaii' | 'playbook' | 'math' | 'data';
+type TabId = 'buckets' | 'history' | 'strategy' | 'buffett' | 'aaii' | 'playbook' | 'math' | 'data';
 
 export default function App() {
   const [tab, setTab] = useState<TabId>('buckets');
@@ -185,6 +186,8 @@ export default function App() {
         <div className="tab-bar">
           <button className={`tab-btn ${tab==='buckets'  ?'active':''}`} onClick={()=>setTab('buckets')}>Buckets → Returns</button>
           <button className={`tab-btn ${tab==='history'  ?'active':''}`} onClick={()=>setTab('history')}>Score History</button>
+          <button className={`tab-btn ${tab==='strategy' ?'active':''}`} onClick={()=>setTab('strategy')}
+            style={{ color: tab==='strategy' ? 'var(--text)' : 'var(--bull,#4ade80)' }}>Strategy A/B</button>
           <button className={`tab-btn ${tab==='aaii'     ?'active':''}`} onClick={()=>setTab('aaii')}
             style={{ color: tab==='aaii' ? 'var(--text)' : 'var(--aaii)' }}>★ AAII</button>
           <button className={`tab-btn ${tab==='buffett'  ?'active':''}`} onClick={()=>setTab('buffett')}>Buffett</button>
@@ -198,6 +201,7 @@ export default function App() {
 
         {tab==='buckets'  && <BucketsPanel currentBucket={result.bucket} predFwd12m={result.predFwd12m} pi80Lo={result.pi80Lo} pi80Hi={result.pi80Hi} pi95Lo={result.pi95Lo} pi95Hi={result.pi95Hi} />}
         {tab==='history'  && <HistoryPanel timeseries={timeseries} />}
+        {tab==='strategy' && <StrategyPanel timeseries={timeseries} compositeScore={result.compositeScore} />}
         {tab==='aaii'     && <AAIIPanel aaii={aaii} history={aaiiHistory} />}
         {tab==='buffett'  && <BuffettPanel />}
         {tab==='playbook' && <PlaybookPanel stance={result.stance} />}
