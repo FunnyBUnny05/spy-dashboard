@@ -240,54 +240,70 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
       {/* OOS audit reference */}
       <div className="chart-box" style={{ marginTop: 12 }}>
         <div className="chart-title">
-          <span>Audit v2 reference — OOS-only monthly rebalance (time-varying txn costs, block-bootstrap Sharpe CI)</span>
+          <span>Audit v2 — OOS monthly rebalance, n=120 months (2011-02 → 2025-04), time-varying txn costs</span>
         </div>
         <table>
           <thead>
             <tr>
               <th>Strategy</th>
               <th>CAGR</th>
+              <th>Vol</th>
               <th>Max DD</th>
               <th>Sharpe</th>
               <th>Sortino</th>
-              <th>Δ Sharpe vs B&H</th>
+              <th>Lo-2002 t</th>
               <th>Notes</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td style={{ color: '#565a61' }}>Buy & Hold</td>
-              <td className="bull">+10.68%</td>
-              <td className="bear">−33.6%</td>
-              <td>+0.68</td>
-              <td>+0.98</td>
-              <td>—</td>
+              <td style={{ color: '#565a61' }}>Buy &amp; Hold</td>
+              <td className="bull">+10.29%</td>
+              <td>16.38%</td>
+              <td className="bear">−24.8%</td>
+              <td>+0.57</td>
+              <td>+0.48</td>
+              <td style={{ color: 'var(--text2)' }}>+1.78</td>
               <td style={{ fontSize: 11, color: 'var(--text2)' }}>Benchmark</td>
             </tr>
             <tr>
               <td style={{ color: '#3d7fd4' }}>5-Tier</td>
-              <td className="bull">+11.09%</td>
-              <td className="bear">−15.5%</td>
-              <td>+0.77</td>
-              <td>+1.09</td>
-              <td className="bull">+0.09</td>
-              <td style={{ fontSize: 11, color: 'var(--text2)' }}>Boot CI [−0.13, +0.29], P&gt;0 = 84%</td>
+              <td className="bull">+10.83%</td>
+              <td>13.85%</td>
+              <td className="bear">−16.5%</td>
+              <td>+0.68</td>
+              <td>+0.62</td>
+              <td className="bull">+2.12</td>
+              <td style={{ fontSize: 11, color: 'var(--text2)' }}>Boot CI [−0.13, +0.29], P&gt;0=84%</td>
             </tr>
-            <tr>
-              <td style={{ color: '#1fa876' }}>Binary ≥60</td>
-              <td className="bull">+11.24%</td>
-              <td className="bear">−13.3%</td>
-              <td>+0.85</td>
-              <td>+1.19</td>
-              <td className="bull">+0.17</td>
-              <td style={{ fontSize: 11, color: 'var(--text2)' }}>Best Sharpe; Lo-2002 t=+2.64</td>
+            <tr style={{ background: 'rgba(31,168,118,0.07)' }}>
+              <td style={{ color: '#1fa876' }}><strong>Binary ≥60</strong></td>
+              <td className="bull"><strong>+11.14%</strong></td>
+              <td><strong>10.95%</strong></td>
+              <td className="bear"><strong>−13.2%</strong></td>
+              <td><strong>+0.85</strong></td>
+              <td><strong>+0.71</strong></td>
+              <td className="bull"><strong>+2.65</strong></td>
+              <td style={{ fontSize: 11, color: '#1fa876' }}>Best on all metrics</td>
             </tr>
           </tbody>
         </table>
-        <div className="callout callout-info" style={{ marginTop: 10 }}>
-          <strong>Takeaway:</strong> Binary ≥60 dominates on Sharpe (+0.85 vs +0.68 B&H, t=+2.64) and halves max
-          drawdown (−13% vs −34%). The 5-tier's edge is statistically directional but not significant
-          alone (84% probability, boot CI crosses 0). Binary ≥60 is the simpler and stronger rule OOS.
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+          <div className="callout callout-info" style={{ margin: 0 }}>
+            <strong>DM test vs drift baseline:</strong> p=0.013 — model forecast is statistically
+            skilled (beats naïve drift at 5% significance level).
+          </div>
+          <div className="callout callout-info" style={{ margin: 0 }}>
+            <strong>Rolling IC:</strong> ρ positive in 100% of 36m windows, mean +0.50,
+            trend +0.086/yr — no evidence of decay.
+          </div>
+        </div>
+        <div className="callout callout-info" style={{ marginTop: 8 }}>
+          <strong>Takeaway:</strong> Binary ≥60 wins on every metric — Sharpe +0.85 vs +0.57 B&H (Lo t=+2.65),
+          CAGR +11.1%, max drawdown halved (−13% vs −25%). Ladder search confirms the optimal rule
+          is simply "invest only when score ≥ 60, otherwise cash." The 5-tier's graduated exposure
+          adds complexity without improving risk-adjusted returns. DM p=0.013 confirms the underlying
+          forecast has genuine skill vs a drift baseline.
         </div>
       </div>
     </div>
