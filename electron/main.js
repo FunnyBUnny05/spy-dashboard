@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { exec } from 'child_process';
-import { readFileSync } from 'fs';
+import { readFileSync, watch as fsWatch } from 'fs';
 import { request as httpsRequest } from 'https';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -69,7 +69,24 @@ function createWindow() {
   if (isDev) {
     win.loadURL('http://localhost:5173');
   } else {
-    win.loadFile(join(__dirname, '../dist/index.html'));
+    // Load from the source tree's dist, not the asar's internal copy, so a
+    // fresh `npm run build` in the source repo updates the app live.
+    win.loadFile(join(projectRoot, 'dist/index.html'));
+  }
+
+  // Watch the source-tree dist/ for rebuilds and auto-reload the window.
+  try {
+    const distDir = join(projectRoot, 'dist');
+    let reloadTimer = null;
+    fsWatch(distDir, { recursive: false }, (_event, filename) => {
+      if (!filename || !/index\.html$/.test(filename)) return;
+      if (reloadTimer) clearTimeout(reloadTimer);
+      reloadTimer = setTimeout(() => {
+        if (win && !win.isDestroyed()) win.webContents.reload();
+      }, 300);
+    });
+  } catch (err) {
+    console.warn('dist watcher failed:', err.message);
   }
 
   // Check for remote updates ~3 s after launch (give the window time to load)
