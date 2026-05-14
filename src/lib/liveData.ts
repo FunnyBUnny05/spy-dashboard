@@ -69,48 +69,37 @@ export function scorePpi(data: PpiData): PpiSignal {
   return { score, raw, desc, latest: yoyPoint, asOf: yoyPoint.date };
 }
 
-// Fetch the latest 2 years from BLS public API and patch missing months onto
-// the backend series (backend can lag by 1-2 months after BLS releases new data).
-async function patchPpiFromBLS(pts: PpiPoint[]): Promise<PpiPoint[]> {
-  const thisYear = new Date().getFullYear();
-  const url = `https://api.bls.gov/publicAPI/v1/timeseries/data/WPUFD4?startyear=${thisYear - 1}&endyear=${thisYear}`;
-  const res = await fetch(url, { cache: 'no-store' });
-  if (!res.ok) return pts;
-  const json = await res.json();
-  if (json.status !== 'REQUEST_SUCCEEDED') return pts;
-
-  // Build a map of date → index from BLS (skip annual M13)
-  const blsMap = new Map<string, number>();
-  for (const obs of json.Results.series[0].data as Array<{ year: string; period: string; value: string }>) {
-    if (obs.period === 'M13') continue;
-    const month = obs.period.replace('M', '').padStart(2, '0');
-    blsMap.set(`${obs.year}-${month}`, parseFloat(obs.value));
-  }
-
-  // Append any months BLS has that the backend doesn't
-  const knownDates = new Set(pts.map(p => p.date));
-  const sorted = [...blsMap.entries()].sort(([a], [b]) => a.localeCompare(b));
-  for (const [date, index] of sorted) {
-    if (knownDates.has(date)) continue;
-    const prev = pts[pts.length - 1];
-    const mom = prev ? ((index - prev.index) / prev.index) * 100 : null;
-    const yearAgo = pts.find(p => p.date === `${parseInt(date.slice(0, 4)) - 1}-${date.slice(5)}`);
-    const yoy = yearAgo ? ((index - yearAgo.index) / yearAgo.index) * 100 : null;
-    pts = [...pts, { date, index, mom, yoy }];
-    knownDates.add(date);
-  }
-  return pts;
-}
-
+// Fetch PPI directly from BLS public API (CORS-open, always current).
+// Pulls 3 years so we have enough history for 3m/6m momentum calcs.
 export async function fetchPpi(): Promise<PpiSignal> {
-  const res = await fetch(`${BASE}/ppi_data.json`, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`PPI fetch failed: ${res.status}`);
-  const data: PpiData = await res.json();
-  // Patch with fresh BLS data if backend is lagging (best-effort, silent on failure)
-  try {
-    data.series.WPUFD4.data = await patchPpiFromBLS(data.series.WPUFD4.data);
-  } catch { /* ignore */ }
-  return scorePpi(data);
+  const now = new Date();
+  const thisYear = now.getFullYear();
+  const url = `https://api.bls.gov/publicAPI/v1/timeseries/data/WPUFD4?startyear=${thisYear - 2}&endyear=${thisYear}`;
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`BLS PPI fetch failed: ${res.status}`);
+  const json = await res.json();
+  if (json.status !== 'REQUEST_SUCCEEDED') throw new Error(`BLS PPI: ${json.message}`);
+
+  // BLS returns newest-first; sort oldest-first and skip annual (M13)
+  const obs: Array<{ year: string; period: string; value: string }> = json.Results.series[0].data;
+  const pts: PpiPoint[] = obs
+    .filter(o => o.period !== 'M13')
+    .map(o => ({
+      date:  `${o.year}-${o.period.replace('M', '').padStart(2, '0')}`,
+      index: parseFloat(o.value),
+      mom:   null as number | null,
+      yoy:   null as number | null,
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  // Compute MoM and YoY from raw index values
+  for (let i = 0; i < pts.length; i++) {
+    if (i > 0) pts[i].mom = ((pts[i].index - pts[i - 1].index) / pts[i - 1].index) * 100;
+    const yAgo = pts.find(p => p.date === `${parseInt(pts[i].date.slice(0, 4)) - 1}-${pts[i].date.slice(5)}`);
+    if (yAgo) pts[i].yoy = ((pts[i].index - yAgo.index) / yAgo.index) * 100;
+  }
+
+  return scorePpi({ last_updated: now.toISOString(), series: { WPUFD4: { data: pts } } });
 }
 
 // ── Margin Debt ───────────────────────────────────────────────────────────────
@@ -162,7 +151,30 @@ export function scoreMarginDebt(data: MarginData): MarginSignal {
   return { score, raw, desc, latest: yoyPoint, asOf: yoyPoint.date };
 }
 
+// Fetch margin debt directly from FINRA xlsx via Electron main-process proxy.
+// Falls back to the Vercel backend if not running in Electron.
 export async function fetchMarginDebt(): Promise<MarginSignal> {
+  const bridge = (window as any).electronBridge as { fetchMarginData?: () => Promise<string> } | undefined;
+  if (bridge?.fetchMarginData) {
+    const jsonStr = await bridge.fetchMarginData();
+    // jsonStr: [{date: "YYYY-MM", margin_debt: number}, ...] newest-first, in $thousands
+    const rows: Array<{ date: string; margin_debt: number }> = JSON.parse(jsonStr);
+
+    // Sort oldest-first, compute YoY
+    const sorted = [...rows].sort((a, b) => a.date.localeCompare(b.date));
+    const pts: MarginPoint[] = sorted.map((r) => {
+      const yAgo = sorted.find(p => p.date === `${parseInt(r.date.slice(0, 4)) - 1}-${r.date.slice(5)}`);
+      return {
+        date:       r.date,
+        margin_debt: r.margin_debt,
+        yoy_growth: yAgo ? ((r.margin_debt - yAgo.margin_debt) / yAgo.margin_debt) * 100 : null,
+      };
+    });
+
+    return scoreMarginDebt({ last_updated: new Date().toISOString(), data: pts });
+  }
+
+  // Fallback: Vercel backend
   const res = await fetch(`${BASE}/margin_data.json`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Margin debt fetch failed: ${res.status}`);
   const data: MarginData = await res.json();

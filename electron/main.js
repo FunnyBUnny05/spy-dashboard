@@ -116,6 +116,36 @@ ipcMain.handle('proxy-fetch', (_event, url) => {
   });
 });
 
+// ── IPC: margin debt from FINRA xlsx ──────────────────────────────────────────
+// Downloads the xlsx (a ZIP of XML) and parses it via Python, which is always
+// available on macOS. Returns JSON array [{date, margin_debt}] newest-first.
+ipcMain.handle('fetch-margin-data', () => {
+  const python = `
+import urllib.request, zipfile, io, re, json, sys
+url = 'https://www.finra.org/sites/default/files/2021-03/margin-statistics.xlsx'
+req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+data = urllib.request.urlopen(req, timeout=15).read()
+with zipfile.ZipFile(io.BytesIO(data)) as z:
+    sheet = z.read('xl/worksheets/sheet1.xml').decode()
+rows = re.findall(r'<row[^>]*r="(\\d+)"[^>]*>(.*?)</row>', sheet, re.DOTALL)
+result = []
+for rnum, row in rows[1:]:  # skip header
+    cells = re.findall(r'<c r="([^"]+)"[^>]*(?:t="([^"]*)")?>[^<]*(?:<v>([^<]*)</v>)?(?:<is><t>([^<]*)</t>)?', row)
+    rd = {}
+    for ref, t, v, iv in cells:
+        rd[re.sub(r'\\d','',ref)] = v or iv
+    if 'A' in rd and 'B' in rd:
+        result.append({'date': rd['A'], 'margin_debt': int(float(rd['B']))})
+print(json.dumps(result))
+`;
+  return new Promise((resolve, reject) => {
+    exec(`python3 << 'PYEOF'\n${python}\nPYEOF`, { timeout: 20000 }, (err, stdout, stderr) => {
+      if (err) reject(new Error(stderr || err.message));
+      else resolve(stdout.trim());
+    });
+  });
+});
+
 // ── app lifecycle ─────────────────────────────────────────────────────────────
 
 app.whenReady().then(() => {

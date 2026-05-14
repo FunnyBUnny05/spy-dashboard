@@ -22,4 +22,6 @@ contextBridge.exposeInMainWorld('electronBridge', {
   },
   // Proxy fetch through main process (no CORS restrictions)
   proxyFetch: (url) => ipcRenderer.invoke('proxy-fetch', url),
+  // Fetch FINRA margin debt xlsx and return parsed JSON string
+  fetchMarginData: () => ipcRenderer.invoke('fetch-margin-data'),
 });
