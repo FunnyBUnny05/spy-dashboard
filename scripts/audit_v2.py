@@ -142,13 +142,24 @@ def exposure(s):
 valid = ~np.isnan(r1m)
 d_v, s_v, p_v, r1_v, rfm_v = dates[valid], scores[valid], preds[valid], r1m[valid], rf_m[valid]
 
-TXN_COST_BPS = 5  # 0.05% per unit exposure change
+# Time-varying transaction cost (bps per unit exposure change).
+# SPY bid/ask + commissions narrowed over the sample. Conservative tiering:
+#   pre-2012:  15 bps  (wider spreads, $0.005/share comm)
+#   2012-2017: 10 bps
+#   2018-2020:  7 bps  (post-discount-broker wars)
+#   2021+:      3 bps  (zero-commission, tight SPY spread)
+def txn_bps(ym):
+    y = int(ym.split('-')[0])
+    if y < 2012: return 15
+    if y < 2018: return 10
+    if y < 2021: return  7
+    return 3
+
 def run_strategy(expose_fn, label):
     exps = np.array([expose_fn(s) for s in s_v])
-    # Transaction cost on exposure change (apply only when rebalancing).
     delta = np.abs(np.diff(np.concatenate([[0.0], exps])))
-    txn = delta * (TXN_COST_BPS / 10000)
-    # Monthly return: exposure * market + (1-exposure) * monthly rf - txn cost
+    bps = np.array([txn_bps(d) for d in d_v])
+    txn = delta * (bps / 10000)
     strat = exps * r1_v + (1 - exps) * rfm_v - txn
     return strat, exps
 
@@ -173,7 +184,7 @@ def report(r, label, rf=rfm_v):
           f'underwater={uw}m  Calmar={calmar:+.2f}')
     return dict(sharpe=sharpe, cagr=cg, mdd=mdd, curve=curve)
 
-print(f'  Transaction cost: {TXN_COST_BPS} bps per exposure change\n')
+print(f'  Transaction cost: 15/10/7/3 bps tiered by year (pre-2012 / 2012-17 / 2018-20 / 2021+)\n')
 M_5T = report(strat_5tier, '5-tier (score-timed)')
 M_BN = report(strat_bin,   'Binary (≥50)')
 M_HC = report(strat_hc,    'Long (≥60)')
@@ -346,6 +357,130 @@ for y_ in years:
     sp = f'{spread:+.2%}' if not np.isnan(spread) else '   —  '
     print(f'  {y_:<6}  {mask.sum():>3}  {bm:>16}  {rm:>16}  {sp:>7}')
 
+# ── I. Circular block bootstrap CI on Sharpe edge ─────────────────────────
+print('\nI ─ CIRCULAR BLOCK BOOTSTRAP CI on Sharpe edge (5-tier − B&H), block=12m\n')
+
+def sharpe_excess(r, rf):
+    ex = r - rf
+    sd = ex.std(ddof=1)
+    return float('nan') if sd < 1e-12 else float(ex.mean() / sd * np.sqrt(12))
+
+def circular_block_indices(n, block, rng):
+    """Resample n indices using circular blocks of length `block`."""
+    k = (n + block - 1) // block
+    starts = rng.integers(0, n, size=k)
+    idx = np.concatenate([(np.arange(block) + s) % n for s in starts])
+    return idx[:n]
+
+rng = np.random.default_rng(0)
+B = 2000
+boot_edge = np.empty(B)
+boot_strat = np.empty(B); boot_bh = np.empty(B)
+for b in range(B):
+    idx = circular_block_indices(len(r1_v), 12, rng)
+    sr = strat_5tier[idx]; br = bh_r[idx]; rfr = rfm_v[idx]
+    boot_strat[b] = sharpe_excess(sr, rfr)
+    boot_bh[b]    = sharpe_excess(br, rfr)
+    boot_edge[b]  = boot_strat[b] - boot_bh[b]
+
+q = lambda a, p: float(np.percentile(a, p))
+print(f'  Bootstrap reps: {B}    block size: 12m    (captures 12m autocorr)')
+print(f'  Δ Sharpe point:  {M_5T["sharpe"]-M_BH["sharpe"]:+.3f}')
+print(f'  Δ Sharpe 95% CI: [{q(boot_edge,2.5):+.3f}, {q(boot_edge,97.5):+.3f}]')
+print(f'  P(Δ Sharpe > 0): {float((boot_edge > 0).mean()):.0%}')
+print(f'  Strategy Sharpe 95% CI: [{q(boot_strat,2.5):+.3f}, {q(boot_strat,97.5):+.3f}]')
+print(f'  B&H Sharpe 95% CI:      [{q(boot_bh,2.5):+.3f}, {q(boot_bh,97.5):+.3f}]')
+
+# ── J. Lo (2002) HAC-adjusted Sharpe SE ────────────────────────────────────
+# Lo, "The Statistics of Sharpe Ratios" (2002): for serially correlated returns,
+# the standard error of the Sharpe ratio (annualized) is:
+#   SE(SR) = sqrt( q(T)/T * (1 + SR^2/2) )
+# where q(T) is the HAC adjustment factor for the variance.
+print('\nJ ─ LO (2002) HAC-ADJUSTED SHARPE STANDARD ERRORS\n')
+
+def lo2002_sharpe_se(r, rf, lag=11):
+    ex = r - rf
+    n = len(ex); mu = ex.mean(); sd = ex.std(ddof=1)
+    sr_m = mu / sd                                  # monthly Sharpe
+    # HAC variance scaling factor q(T) for serial dependence in ex^2 differences
+    e = ex - mu
+    s2 = (e @ e) / n
+    auto = sum(2 * (1 - L/(lag+1)) * (e[L:] @ e[:-L]) / n for L in range(1, lag+1))
+    q_T = 1 + auto / s2 if s2 > 0 else 1.0
+    se_monthly = np.sqrt(max(q_T, 1.0) / n * (1 + sr_m**2 / 2))
+    return float(sr_m * np.sqrt(12)), float(se_monthly * np.sqrt(12))
+
+print(f'  {"strategy":<22}  {"Sharpe":>7}  {"SE":>6}  {"95% CI":>20}  {"t":>5}')
+for label, r in [('5-tier', strat_5tier), ('Binary≥50', strat_bin),
+                 ('Long≥60', strat_hc), ('Buy-and-hold', bh_r)]:
+    sr, se = lo2002_sharpe_se(r, rfm_v)
+    ci_lo, ci_hi = sr - 1.96*se, sr + 1.96*se
+    t = sr/se if se > 0 else float('nan')
+    print(f'  {label:<22}  {sr:>+7.3f}  {se:>6.3f}  [{ci_lo:+.3f}, {ci_hi:+.3f}]  {t:>+5.2f}')
+
+# ── K. Exposure ladder optimization ────────────────────────────────────────
+# Sweep over reasonable 5-tier ladders. Find the ladder that maximizes the
+# in-sample monthly-rebalance Sharpe — and report whether the simple binary
+# rules (long if ≥X) actually dominate.
+print('\nK ─ EXPOSURE-LADDER OPTIMIZATION (grid search over 5-tier ladders)\n')
+
+# Search grid (kept small to stay fast).
+GRID = [0.0, 0.2, 0.4, 0.5, 0.7, 1.0, 1.2]
+best = []
+for e1 in GRID:
+    for e2 in GRID:
+        if e2 < e1: continue
+        for e3 in GRID:
+            if e3 < e2: continue
+            for e4 in GRID:
+                if e4 < e3: continue
+                for e5 in GRID:
+                    if e5 < e4: continue
+                    expose = lambda s, ladder=(e1,e2,e3,e4,e5): (
+                        ladder[4] if s >= 80 else ladder[3] if s >= 60 else
+                        ladder[2] if s >= 40 else ladder[1] if s >= 20 else ladder[0]
+                    )
+                    sr_v, _ = run_strategy(expose, 'sweep')
+                    sh = sharpe_excess(sr_v, rfm_v)
+                    if not np.isnan(sh):
+                        best.append(((e1,e2,e3,e4,e5), sh, sr_v))
+
+best.sort(key=lambda x: -x[1])
+print(f'  Searched {len(best)} monotone ladders. Top 5 by Sharpe:')
+print(f'  {"<20":>5} {"20-40":>6} {"40-60":>6} {"60-80":>6} {"≥80":>5}    {"Sharpe":>7}  {"CAGR":>7}  {"MDD":>7}')
+for ladder, sh, sr_v in best[:5]:
+    cg = cagr(sr_v); _, mdd, _ = equity_curve(sr_v)
+    print(f'  {ladder[0]:>5.1f} {ladder[1]:>6.1f} {ladder[2]:>6.1f} {ladder[3]:>6.1f} {ladder[4]:>5.1f}    '
+          f'{sh:>+7.3f}  {cg:>+7.2%}  {mdd:>+7.2%}')
+
+current_ladder = (0.2, 0.4, 0.7, 1.0, 1.2)
+cur_idx = next((i for i,(l,_,_) in enumerate(best) if l == current_ladder), None)
+print(f'\n  Current production ladder (0.2/0.4/0.7/1.0/1.2): '
+      f'rank {cur_idx+1 if cur_idx is not None else "—"} of {len(best)}, '
+      f'Sharpe {M_5T["sharpe"]:+.3f}')
+print(f'  Caveat: this is IN-SAMPLE search on OOS predictions → ladder is overfit'
+      f' to the test set, treat the top-5 as upper bound on achievable Sharpe.')
+
+# ── L. Conditional VaR / CVaR by score bucket ──────────────────────────────
+print('\nL ─ TAIL RISK BY SCORE BUCKET — VaR(5%) and CVaR(5%) on fwd_1m\n')
+print(f'  {"bucket":<8}  {"n":>4}  {"mean":>7}  {"VaR 5%":>8}  {"CVaR 5%":>8}  '
+      f'{"worst":>7}  {"P(<0)":>6}')
+for lo, hi, lbl in buckets:
+    mask = (s_v >= lo) & (s_v < hi)
+    if mask.sum() < 5:
+        print(f'  {lbl:<8}  {mask.sum():>4}   (too few)')
+        continue
+    rr = r1_v[mask]
+    var5 = float(np.percentile(rr, 5))
+    tail = rr[rr <= var5]
+    cvar5 = float(tail.mean()) if len(tail) else float('nan')
+    p_neg = float((rr < 0).mean())
+    print(f'  {lbl:<8}  {mask.sum():>4}  {rr.mean()*12:>+7.2%}  {var5:>+8.2%}  '
+          f'{cvar5:>+8.2%}  {rr.min():>+7.2%}  {p_neg:>6.0%}')
+
+print(f'\n  Interpretation: VaR is the monthly loss you exceed 5% of the time;'
+      f' CVaR is the average loss when you do.')
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 print('\n═══════════════════════════════════════════════════════════════════════')
 print('  AUDIT v2 SUMMARY')
@@ -353,7 +488,12 @@ print('════════════════════════�
 print(f'  Monthly-rebalance strategy:')
 print(f'    5-tier:   CAGR {M_5T["cagr"]:+.2%}  Sharpe {M_5T["sharpe"]:+.2f}  MDD {M_5T["mdd"]:+.2%}')
 print(f'    B&H:      CAGR {M_BH["cagr"]:+.2%}  Sharpe {M_BH["sharpe"]:+.2f}  MDD {M_BH["mdd"]:+.2%}')
-print(f'  Δ Sharpe edge:   {M_5T["sharpe"]-M_BH["sharpe"]:+.2f}')
-print(f'  HAC t-stat (strat − B&H): {t_stat:+.2f}   p={p_val:.4f}')
+print(f'  Δ Sharpe edge:   {M_5T["sharpe"]-M_BH["sharpe"]:+.2f}'
+      f'   block-boot 95% CI [{q(boot_edge,2.5):+.2f}, {q(boot_edge,97.5):+.2f}]'
+      f'   P(>0)={float((boot_edge > 0).mean()):.0%}')
+print(f'  HAC t-stat (strat − B&H 12m): {t_stat:+.2f}   p={p_val:.4f}')
 print(f'  DM vs drift:     {dm_stat:+.2f}  p={dm_p/2:.4f}')
+best_ladder, best_sh, _ = best[0]
+print(f'  Best ladder found: {best_ladder}  Sharpe {best_sh:+.3f}'
+      f' (vs current 0.2/0.4/0.7/1.0/1.2 {M_5T["sharpe"]:+.3f}, in-sample upper bound)')
 print('═══════════════════════════════════════════════════════════════════════')
