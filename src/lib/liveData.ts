@@ -69,10 +69,47 @@ export function scorePpi(data: PpiData): PpiSignal {
   return { score, raw, desc, latest: yoyPoint, asOf: yoyPoint.date };
 }
 
+// Fetch the latest 2 years from BLS public API and patch missing months onto
+// the backend series (backend can lag by 1-2 months after BLS releases new data).
+async function patchPpiFromBLS(pts: PpiPoint[]): Promise<PpiPoint[]> {
+  const thisYear = new Date().getFullYear();
+  const url = `https://api.bls.gov/publicAPI/v1/timeseries/data/WPUFD4?startyear=${thisYear - 1}&endyear=${thisYear}`;
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) return pts;
+  const json = await res.json();
+  if (json.status !== 'REQUEST_SUCCEEDED') return pts;
+
+  // Build a map of date → index from BLS (skip annual M13)
+  const blsMap = new Map<string, number>();
+  for (const obs of json.Results.series[0].data as Array<{ year: string; period: string; value: string }>) {
+    if (obs.period === 'M13') continue;
+    const month = obs.period.replace('M', '').padStart(2, '0');
+    blsMap.set(`${obs.year}-${month}`, parseFloat(obs.value));
+  }
+
+  // Append any months BLS has that the backend doesn't
+  const knownDates = new Set(pts.map(p => p.date));
+  const sorted = [...blsMap.entries()].sort(([a], [b]) => a.localeCompare(b));
+  for (const [date, index] of sorted) {
+    if (knownDates.has(date)) continue;
+    const prev = pts[pts.length - 1];
+    const mom = prev ? ((index - prev.index) / prev.index) * 100 : null;
+    const yearAgo = pts.find(p => p.date === `${parseInt(date.slice(0, 4)) - 1}-${date.slice(5)}`);
+    const yoy = yearAgo ? ((index - yearAgo.index) / yearAgo.index) * 100 : null;
+    pts = [...pts, { date, index, mom, yoy }];
+    knownDates.add(date);
+  }
+  return pts;
+}
+
 export async function fetchPpi(): Promise<PpiSignal> {
   const res = await fetch(`${BASE}/ppi_data.json`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`PPI fetch failed: ${res.status}`);
   const data: PpiData = await res.json();
+  // Patch with fresh BLS data if backend is lagging (best-effort, silent on failure)
+  try {
+    data.series.WPUFD4.data = await patchPpiFromBLS(data.series.WPUFD4.data);
+  } catch { /* ignore */ }
   return scorePpi(data);
 }
 
