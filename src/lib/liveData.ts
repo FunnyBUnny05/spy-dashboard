@@ -236,7 +236,63 @@ export function scoreBuffett(data: BuffettApiData): BuffettSignal {
   return { score, raw, desc, detail, asOf: lastPt.date, history: pts };
 }
 
+function scrapeBuffettCMV(html: string): BuffettSignal | null {
+  // Ratio e.g. "230%"
+  const ratioM = html.match(/current ratio of (\d+(?:\.\d+)?)%/i)
+    ?? html.match(/Buffett Indicator(?:\s+value)? of (\d+(?:\.\d+)?)%/i);
+  // Std devs e.g. "2.4 standard deviations"
+  const sigmaM = html.match(/(\d+(?:\.\d+)?)\s+standard deviations? above/i);
+  // Deviation % e.g. "75.15%"
+  const devM   = html.match(/approximately (\d+(?:\.\d+)?)%.*?above the historical trend/i);
+  // Valuation label
+  const valM   = html.match(/market is ([\w\s]+?Overvalued|Fairly Valued|[\w\s]+?Undervalued)\b/i);
+  // As-of date e.g. "December 31, 2025"
+  const dateM  = html.match(/As of (\w+ \d+,?\s*\d{4})/i);
+
+  if (!ratioM || !sigmaM) return null;
+
+  const ratio   = parseFloat(ratioM[1]);
+  const stdDevs = parseFloat(sigmaM[1]);
+  const devPct  = devM ? parseFloat(devM[1]) : stdDevs * 30; // rough fallback
+  const valuation = valM ? valM[1].trim().toUpperCase() : 'OVERVALUED';
+  const asOf = dateM ? dateM[1] : 'unknown';
+
+  const score = Math.max(5, Math.min(95, Math.round(50 - stdDevs * 15)));
+  const raw  = `${ratio.toFixed(0)}%, Z +${stdDevs.toFixed(2)}`;
+  const desc = `Above +${stdDevs >= 2 ? '2' : '1'}σ (${valuation})`;
+
+  return {
+    score, raw, desc,
+    detail: { ratio, trend: ratio - devPct, upper2sigma: 0, lower2sigma: 0, zScore: stdDevs },
+    asOf,
+    history: [],   // CMV page doesn't expose chart data; keep using backend for history
+  };
+}
+
 export async function fetchBuffett(): Promise<BuffettSignal> {
+  // Try currentmarketvaluation.com via Electron proxy (no CORS) for freshest data
+  const bridge = (window as any).electronBridge as { proxyFetch?: (url: string) => Promise<string> } | undefined;
+  if (bridge?.proxyFetch) {
+    try {
+      const html = await bridge.proxyFetch('https://www.currentmarketvaluation.com/models/buffett-indicator.php');
+      const scraped = scrapeBuffettCMV(html);
+      if (scraped) {
+        // Still fetch backend for history data, but overlay current values
+        try {
+          const res2 = await fetch(`${BASE}/buffett_indicator_data.json`, { cache: 'no-store' });
+          if (res2.ok) {
+            const legacy: BuffettApiData = await res2.json();
+            scraped.history = legacy.data;
+            scraped.detail.upper2sigma = legacy.data.at(-1)?.band_plus2 ?? 0;
+            scraped.detail.lower2sigma = legacy.data.at(-1)?.band_minus2 ?? 0;
+          }
+        } catch { /* ignore */ }
+        return scraped;
+      }
+    } catch { /* fall through to backend */ }
+  }
+
+  // Fallback: original Vercel backend
   const res = await fetch(`${BASE}/buffett_indicator_data.json`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Buffett fetch failed: ${res.status}`);
   const data: BuffettApiData = await res.json();

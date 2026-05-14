@@ -3,6 +3,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { exec } from 'child_process';
 import { readFileSync } from 'fs';
+import { request as httpsRequest } from 'https';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const isDev = process.env.NODE_ENV === 'development';
@@ -101,6 +102,19 @@ ipcMain.on('trigger-update', async () => {
 
 // ── IPC: manual re-check ──────────────────────────────────────────────────────
 ipcMain.on('check-updates', () => checkForUpdates());
+
+// ── IPC: proxy fetch (bypasses renderer CORS) ─────────────────────────────────
+ipcMain.handle('proxy-fetch', (_event, url) => {
+  return new Promise((resolve, reject) => {
+    const req = httpsRequest(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res) => {
+      let body = '';
+      res.on('data', chunk => { body += chunk; });
+      res.on('end', () => resolve(body));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+});
 
 // ── app lifecycle ─────────────────────────────────────────────────────────────
 

@@ -20,4 +20,6 @@ contextBridge.exposeInMainWorld('electronBridge', {
   checkForUpdates: () => {
     ipcRenderer.send('check-updates');
   },
+  // Proxy fetch through main process (no CORS restrictions)
+  proxyFetch: (url) => ipcRenderer.invoke('proxy-fetch', url),
 });
