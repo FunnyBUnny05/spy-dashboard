@@ -64,12 +64,13 @@ function vixLabel(v: number): { label: string; color: string } {
 
 interface Props {
   onSignals: (sig: VixSignals | null) => void;
+  initialSignals?: VixSignals | null;
 }
 
-export function VixCsvDrop({ onSignals }: Props) {
-  const [status, setStatus] = useState<'idle' | 'hover' | 'ok' | 'error'>('idle');
-  const [message, setMessage] = useState('');
-  const [signals, setSignals] = useState<VixSignals | null>(null);
+export function VixCsvDrop({ onSignals, initialSignals }: Props) {
+  const [status, setStatus] = useState<'idle' | 'hover' | 'ok' | 'error'>(initialSignals ? 'ok' : 'idle');
+  const [message, setMessage] = useState(initialSignals ? `Restored: ${initialSignals.rows} bars — VIX ${initialSignals.vixClose.toFixed(2)} as of ${initialSignals.asOf}` : '');
+  const [signals, setSignals] = useState<VixSignals | null>(initialSignals ?? null);
 
   const processFile = useCallback((file: File) => {
     if (!file.name.endsWith('.csv') && !file.type.includes('csv') && !file.type.includes('text')) {

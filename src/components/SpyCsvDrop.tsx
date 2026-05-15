@@ -202,12 +202,13 @@ function parseCSV(text: string): SpyRow[] {
 
 interface Props {
   onSignals: (sig: SpySignals | null) => void;
+  initialSignals?: SpySignals | null;
 }
 
-export function SpyCsvDrop({ onSignals }: Props) {
-  const [status, setStatus] = useState<'idle' | 'hover' | 'ok' | 'error'>('idle');
-  const [message, setMessage] = useState('');
-  const [signals, setSignals] = useState<SpySignals | null>(null);
+export function SpyCsvDrop({ onSignals, initialSignals }: Props) {
+  const [status, setStatus] = useState<'idle' | 'hover' | 'ok' | 'error'>(initialSignals ? 'ok' : 'idle');
+  const [message, setMessage] = useState(initialSignals ? `Restored: ${initialSignals.rows} bars through ${initialSignals.asOf}` : '');
+  const [signals, setSignals] = useState<SpySignals | null>(initialSignals ?? null);
 
   const processFile = useCallback((file: File) => {
     if (!file.name.endsWith('.csv') && !file.type.includes('csv') && !file.type.includes('text')) {

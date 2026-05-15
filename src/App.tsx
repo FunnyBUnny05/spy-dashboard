@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import './lib/chartSetup';
 
 import { CURRENT } from './lib/snapshot';
@@ -49,10 +49,25 @@ export default function App() {
     return () => { cancelled = true; };
   }, [refreshKey]);
 
-  // SPY CSV → replace RSI/MFI/trend signals
-  const [spySignals, setSpySignals] = useState<SpySignals | null>(null);
-  // VIX CSV → replace VIX close value
-  const [vixSignals, setVixSignals] = useState<VixSignals | null>(null);
+  // SPY CSV → replace RSI/MFI/trend signals (persisted across sessions)
+  const [spySignals, setSpySignals] = useState<SpySignals | null>(() => {
+    try { const s = localStorage.getItem('spy_csv_signals'); return s ? JSON.parse(s) : null; } catch { return null; }
+  });
+  const handleSpySignals = useCallback((sig: SpySignals | null) => {
+    setSpySignals(sig);
+    if (sig) localStorage.setItem('spy_csv_signals', JSON.stringify(sig));
+    else localStorage.removeItem('spy_csv_signals');
+  }, []);
+
+  // VIX CSV → replace VIX close value (persisted across sessions)
+  const [vixSignals, setVixSignals] = useState<VixSignals | null>(() => {
+    try { const s = localStorage.getItem('vix_csv_signals'); return s ? JSON.parse(s) : null; } catch { return null; }
+  });
+  const handleVixSignals = useCallback((sig: VixSignals | null) => {
+    setVixSignals(sig);
+    if (sig) localStorage.setItem('vix_csv_signals', JSON.stringify(sig));
+    else localStorage.removeItem('vix_csv_signals');
+  }, []);
 
   // Build raw signal inputs — live/csv override snapshot
   const rawInputs: RawSignalValues = useMemo(() => ({
@@ -213,8 +228,8 @@ export default function App() {
         {tab==='math'     && <MathPanel signals={result.signals} composite={result.compositeScore} />}
         {tab==='data'     && (
           <>
-            <SpyCsvDrop onSignals={setSpySignals} />
-            <VixCsvDrop onSignals={setVixSignals} />
+            <SpyCsvDrop onSignals={handleSpySignals} initialSignals={spySignals} />
+            <VixCsvDrop onSignals={handleVixSignals} initialSignals={vixSignals} />
           </>
         )}
       </div>
