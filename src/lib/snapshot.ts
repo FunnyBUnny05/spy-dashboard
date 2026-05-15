@@ -53,11 +53,11 @@ export const CURRENT: RawSnapshot = {
   aaiiSpread: 0.526,   // 68.5% stocks - 15.9% cash
 
   // ← UPDATE MANUALLY each month (CBOE: cboe.com/tradable_products/vix)
-  vixClose: 16.99,
+  vixClose: 17.19,
 
   // ← UPDATE MANUALLY each month
-  yieldCurve10y3m: 0.805,  // Apr 2026: ~4.41% (^TNX) − ~3.61% (^IRX)
-  breadth12mChg:  -6.70,   // Apr 2026: RSP/SPY 12m % change (cap-weight leading)
+  yieldCurve10y3m: 0.76,   // May 2026: ~4.45% (^TNX) − ~3.69% (^IRX)
+  breadth12mChg:  -7.80,   // May 2026: RSP/SPY 12m % change (RSP +18.3% vs SPY +27.9%)
 
   buffettDetail: {
     ratio: 228,
