@@ -11,6 +11,7 @@ import {
 } from './lib/scoring';
 import { fetchLiveData, type LiveData } from './lib/liveData';
 import { SpyCsvDrop, type SpySignals } from './components/SpyCsvDrop';
+import { VixCsvDrop, type VixSignals } from './components/VixCsvDrop';
 
 import { Gauge }         from './components/Gauge';
 import { ForwardReturns } from './components/ForwardReturns';
@@ -50,6 +51,8 @@ export default function App() {
 
   // SPY CSV → replace RSI/MFI/trend signals
   const [spySignals, setSpySignals] = useState<SpySignals | null>(null);
+  // VIX CSV → replace VIX close value
+  const [vixSignals, setVixSignals] = useState<VixSignals | null>(null);
 
   // Build raw signal inputs — live/csv override snapshot
   const rawInputs: RawSignalValues = useMemo(() => ({
@@ -59,7 +62,7 @@ export default function App() {
     ppiYoy:          liveData?.ppi.latest.yoy          ?? CURRENT.ppiYoy,
     mdebtYoy:        liveData?.margin.latest.yoy_growth ?? CURRENT.mdebtYoy,
     aaiiSpread:      aaii.spread,
-    vixClose:        liveData?.vix?.value ?? CURRENT.vixClose,
+    vixClose:        vixSignals?.vixClose ?? liveData?.vix?.value ?? CURRENT.vixClose,
     yieldCurve10y3m: CURRENT.yieldCurve10y3m,  // manual monthly update
     breadth12mChg:   CURRENT.breadth12mChg,     // manual monthly update
   }), [spySignals, liveData, aaii]);
@@ -91,7 +94,8 @@ export default function App() {
   } else {
     asOfParts.push(CURRENT.asOf);
   }
-  if (spySignals) asOfParts.push(`CSV ${spySignals.asOf}`);
+  if (spySignals) asOfParts.push(`SPX CSV ${spySignals.asOf}`);
+  if (vixSignals) asOfParts.push(`VIX CSV ${vixSignals.asOf}`);
   const asOf = asOfParts.join(' · ');
 
   const liveLabel = liveStatus === 'loading' ? '⟳ fetching…'
@@ -156,7 +160,8 @@ export default function App() {
         <div className="section-hdr">
           Seven signals — value · historical percentile · correlation with 12m forward return
           {liveStatus === 'ok' && <span className="live-badge"> PPI · Margin Debt{liveData?.vix ? ' · VIX' : ''} live</span>}
-          {spySignals          && <span className="live-badge"> RSI · MFI · Trend from CSV</span>}
+          {spySignals          && <span className="live-badge"> RSI · MFI · Trend from SPX CSV</span>}
+          {vixSignals          && <span className="live-badge"> VIX from CSV</span>}
         </div>
         <SubScores signals={result.signals} />
 
@@ -194,8 +199,8 @@ export default function App() {
           <button className={`tab-btn ${tab==='playbook' ?'active':''}`} onClick={()=>setTab('playbook')}>Playbook</button>
           <button className={`tab-btn ${tab==='math'     ?'active':''}`} onClick={()=>setTab('math')}>Math</button>
           <button className={`tab-btn ${tab==='data'     ?'active':''}`} onClick={()=>setTab('data')}
-            style={{ color: tab==='data' ? 'var(--text)' : spySignals ? 'var(--bull,#4ade80)' : 'var(--aaii)' }}>
-            {spySignals ? '✓ SPY Data' : '↑ SPY Data'}
+            style={{ color: tab==='data' ? 'var(--text)' : (spySignals || vixSignals) ? 'var(--bull,#4ade80)' : 'var(--aaii)' }}>
+            {(spySignals || vixSignals) ? '✓ Market Data' : '↑ Market Data'}
           </button>
         </div>
 
@@ -206,7 +211,12 @@ export default function App() {
         {tab==='buffett'  && <BuffettPanel />}
         {tab==='playbook' && <PlaybookPanel stance={result.stance} />}
         {tab==='math'     && <MathPanel signals={result.signals} composite={result.compositeScore} />}
-        {tab==='data'     && <SpyCsvDrop onSignals={setSpySignals} />}
+        {tab==='data'     && (
+          <>
+            <SpyCsvDrop onSignals={setSpySignals} />
+            <VixCsvDrop onSignals={setVixSignals} />
+          </>
+        )}
       </div>
 
       <footer>
