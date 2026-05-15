@@ -21,19 +21,28 @@ function binaryExposure(score: number): number {
 }
 
 function buildCurve(timeseries: TsRow[]) {
-  const rows = timeseries.filter(r => r.score !== null && r.spy != null && r.spy > 0);
+  // Use ALL consecutive monthly rows (not just scored ones) to avoid
+  // multi-month return jumps across scoring gaps.
+  // Score is carried forward from the most recent scored month.
+  const rows = timeseries.filter(r => r.spy != null && r.spy > 0);
   const labels: string[] = [];
   const bh: number[] = [];
   const ft: number[] = [];
   const b60: number[] = [];
 
   let bhV = 100, ftV = 100, b60V = 100;
-  for (let i = 0; i < rows.length - 1; i++) {
-    const score = rows[i].score!;
+  let lastScore: number | null = null;
+  // Find first scored row index
+  const firstScored = rows.findIndex(r => r.score !== null);
+  if (firstScored < 0) return { labels, bh, ft, b60 };
+
+  for (let i = firstScored; i < rows.length - 1; i++) {
+    if (rows[i].score !== null) lastScore = rows[i].score;
+    if (lastScore === null) continue;
     const ret = rows[i + 1].spy / rows[i].spy - 1;
     bhV  *= (1 + ret);
-    ftV  *= (1 + fiveTierExposure(score) * ret);
-    b60V *= (1 + binaryExposure(score) * ret);
+    ftV  *= (1 + fiveTierExposure(lastScore) * ret);
+    b60V *= (1 + binaryExposure(lastScore) * ret);
     labels.push(rows[i + 1].date);
     bh.push(+bhV.toFixed(2));
     ft.push(+ftV.toFixed(2));
@@ -199,8 +208,9 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
           }} />
         </div>
         <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 6, padding: '0 4px' }}>
-          No transaction costs. Cash earns 0%. Score from month t sets exposure for the t→t+1 period.
-          Uses all months with a score (in-sample and OOS). OOS-only metrics in the table below.
+          No transaction costs. Cash earns 0%. Score from month t sets exposure for t→t+1.
+          All consecutive months used; score carried forward over unscored gaps.
+          Includes in-sample periods (look-ahead) — verified OOS-only numbers in table below.
         </div>
       </div>
 
