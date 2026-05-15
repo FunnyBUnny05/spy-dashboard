@@ -1,10 +1,10 @@
 /**
  * Live data fetcher — pulls PPI, margin debt, and Buffett indicator from
- * https://stock-sentinel-55b9j8kc2-funnybunny05s-projects.vercel.app
+ * https://stock-sentinel-7n2zayq4n-funnybunny05s-projects.vercel.app
  * which updates monthly.
  */
 
-const BASE = 'https://stock-sentinel-55b9j8kc2-funnybunny05s-projects.vercel.app';
+const BASE = 'https://stock-sentinel-7n2zayq4n-funnybunny05s-projects.vercel.app';
 
 // ── PPI ───────────────────────────────────────────────────────────────────────
 
