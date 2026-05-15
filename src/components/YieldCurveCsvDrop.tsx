@@ -31,8 +31,6 @@ function parseYieldCSV(text: string): { date: string; value: number }[] {
   if (lines.length < 2) throw new Error('CSV too short');
   const header = lines[0].toLowerCase().split(',').map(h => h.trim().replace(/"/g, ''));
   const dateIdx  = header.findIndex(h => h === 'time' || h === 'date');
-  const closeIdx = header.findIndex(h => h.includes('adj'))
-    ?? header.findIndex(h => h === 'close' || h === 'value');
   const finalClose = header.findIndex(h => h.includes('adj')) >= 0
     ? header.findIndex(h => h.includes('adj'))
     : header.findIndex(h => h === 'close' || h === 'value');
