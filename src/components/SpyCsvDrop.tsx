@@ -29,6 +29,7 @@ export interface SpySignals {
   mfi14: number;
   asOf: string;
   priceLatest: number;
+  return12m: number; // 12m price return % (used for RSP/SPY breadth ratio)
   rows: number;
 }
 
@@ -112,6 +113,10 @@ export function computeSpySignals(rows: SpyRow[]): SpySignals | null {
   const mfi14 = calcMFI(rows);
   const obvDiv = calcOBVDivergence(rows);
 
+  // 12m return: compare latest close to close ~52 weekly bars ago
+  const price52wAgo = rows[rows.length - 53]?.close ?? rows[0].close;
+  const return12m = ((latest.close - price52wAgo) / price52wAgo) * 100;
+
   return {
     rsi14,
     ema50w: ema50Ratio,
@@ -119,6 +124,7 @@ export function computeSpySignals(rows: SpyRow[]): SpySignals | null {
     mfi14,
     asOf: latest.date,
     priceLatest: latest.close,
+    return12m,
     rows: rows.length,
   };
 }

@@ -12,6 +12,8 @@ import {
 import { fetchLiveData, type LiveData } from './lib/liveData';
 import { SpyCsvDrop, type SpySignals } from './components/SpyCsvDrop';
 import { VixCsvDrop, type VixSignals } from './components/VixCsvDrop';
+import { YieldCurveCsvDrop, type YieldCurveSignals } from './components/YieldCurveCsvDrop';
+import { BreadthCsvDrop, type BreadthSignals } from './components/BreadthCsvDrop';
 
 import { Gauge }         from './components/Gauge';
 import { ForwardReturns } from './components/ForwardReturns';
@@ -69,6 +71,26 @@ export default function App() {
     else localStorage.removeItem('vix_csv_signals');
   }, []);
 
+  // Yield curve CSV → replace yieldCurve10y3m (persisted)
+  const [yieldSignals, setYieldSignals] = useState<YieldCurveSignals | null>(() => {
+    try { const s = localStorage.getItem('yield_csv_signals'); return s ? JSON.parse(s) : null; } catch { return null; }
+  });
+  const handleYieldSignals = useCallback((sig: YieldCurveSignals | null) => {
+    setYieldSignals(sig);
+    if (sig) localStorage.setItem('yield_csv_signals', JSON.stringify(sig));
+    else localStorage.removeItem('yield_csv_signals');
+  }, []);
+
+  // RSP/breadth CSV → replace breadth12mChg (persisted)
+  const [breadthSignals, setBreadthSignals] = useState<BreadthSignals | null>(() => {
+    try { const s = localStorage.getItem('breadth_csv_signals'); return s ? JSON.parse(s) : null; } catch { return null; }
+  });
+  const handleBreadthSignals = useCallback((sig: BreadthSignals | null) => {
+    setBreadthSignals(sig);
+    if (sig) localStorage.setItem('breadth_csv_signals', JSON.stringify(sig));
+    else localStorage.removeItem('breadth_csv_signals');
+  }, []);
+
   // Build raw signal inputs — live/csv override snapshot
   const rawInputs: RawSignalValues = useMemo(() => ({
     rsi14m:          spySignals?.rsi14   ?? CURRENT.rsi14m,
@@ -78,9 +100,9 @@ export default function App() {
     mdebtYoy:        liveData?.margin.latest.yoy_growth ?? CURRENT.mdebtYoy,
     aaiiSpread:      aaii.spread,
     vixClose:        vixSignals?.vixClose ?? liveData?.vix?.value ?? CURRENT.vixClose,
-    yieldCurve10y3m: CURRENT.yieldCurve10y3m,  // manual monthly update
-    breadth12mChg:   CURRENT.breadth12mChg,     // manual monthly update
-  }), [spySignals, liveData, aaii]);
+    yieldCurve10y3m: yieldSignals?.yieldSpread   ?? CURRENT.yieldCurve10y3m,
+    breadth12mChg:   breadthSignals?.breadth12mChg ?? CURRENT.breadth12mChg,
+  }), [spySignals, liveData, aaii, yieldSignals, breadthSignals]);
 
   const result     = useMemo(() => computeV2(rawInputs), [rawInputs]);
 
@@ -113,8 +135,10 @@ export default function App() {
   } else {
     asOfParts.push(CURRENT.asOf);
   }
-  if (spySignals) asOfParts.push(`SPX CSV ${spySignals.asOf}`);
-  if (vixSignals) asOfParts.push(`VIX CSV ${vixSignals.asOf}`);
+  if (spySignals)     asOfParts.push(`SPX CSV ${spySignals.asOf}`);
+  if (vixSignals)     asOfParts.push(`VIX CSV ${vixSignals.asOf}`);
+  if (yieldSignals)   asOfParts.push(`Yield CSV ${yieldSignals.asOf}`);
+  if (breadthSignals) asOfParts.push(`Breadth CSV ${breadthSignals.asOf}`);
   const asOf = asOfParts.join(' · ');
 
   const liveLabel = liveStatus === 'loading' ? '⟳ fetching…'
@@ -179,8 +203,10 @@ export default function App() {
         <div className="section-hdr">
           Seven signals — value · historical percentile · correlation with 12m forward return
           {liveStatus === 'ok' && <span className="live-badge"> PPI · Margin Debt{liveData?.vix ? ' · VIX' : ''} live</span>}
-          {spySignals          && <span className="live-badge"> RSI · MFI · Trend from SPX CSV</span>}
-          {vixSignals          && <span className="live-badge"> VIX from CSV</span>}
+          {spySignals     && <span className="live-badge"> RSI · MFI · Trend from SPX CSV</span>}
+          {vixSignals     && <span className="live-badge"> VIX from CSV</span>}
+          {yieldSignals   && <span className="live-badge"> Yield curve from CSV</span>}
+          {breadthSignals && <span className="live-badge"> Breadth from RSP CSV</span>}
         </div>
         <SubScores signals={result.signals} />
 
@@ -218,8 +244,8 @@ export default function App() {
           <button className={`tab-btn ${tab==='playbook' ?'active':''}`} onClick={()=>setTab('playbook')}>Playbook</button>
           <button className={`tab-btn ${tab==='math'     ?'active':''}`} onClick={()=>setTab('math')}>Math</button>
           <button className={`tab-btn ${tab==='data'     ?'active':''}`} onClick={()=>setTab('data')}
-            style={{ color: tab==='data' ? 'var(--text)' : (spySignals || vixSignals) ? 'var(--bull,#4ade80)' : 'var(--aaii)' }}>
-            {(spySignals || vixSignals) ? '✓ Market Data' : '↑ Market Data'}
+            style={{ color: tab==='data' ? 'var(--text)' : (spySignals || vixSignals || yieldSignals || breadthSignals) ? 'var(--bull,#4ade80)' : 'var(--aaii)' }}>
+            {(spySignals || vixSignals || yieldSignals || breadthSignals) ? '✓ Market Data' : '↑ Market Data'}
           </button>
         </div>
 
@@ -234,6 +260,12 @@ export default function App() {
           <>
             <SpyCsvDrop onSignals={handleSpySignals} initialSignals={spySignals} />
             <VixCsvDrop onSignals={handleVixSignals} initialSignals={vixSignals} />
+            <YieldCurveCsvDrop onSignals={handleYieldSignals} initialSignals={yieldSignals} />
+            <BreadthCsvDrop
+              onSignals={handleBreadthSignals}
+              initialSignals={breadthSignals}
+              spyReturn12m={spySignals?.return12m ?? null}
+            />
           </>
         )}
       </div>
