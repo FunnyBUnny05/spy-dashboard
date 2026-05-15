@@ -52,8 +52,15 @@ export default function App() {
   }, [refreshKey]);
 
   // SPY CSV → replace RSI/MFI/trend signals (persisted across sessions)
+  // Migration: drop stale entry if it's missing return12m (added later)
   const [spySignals, setSpySignals] = useState<SpySignals | null>(() => {
-    try { const s = localStorage.getItem('spy_csv_signals'); return s ? JSON.parse(s) : null; } catch { return null; }
+    try {
+      const s = localStorage.getItem('spy_csv_signals');
+      if (!s) return null;
+      const parsed: SpySignals = JSON.parse(s);
+      if (parsed.return12m == null) { localStorage.removeItem('spy_csv_signals'); return null; }
+      return parsed;
+    } catch { return null; }
   });
   const handleSpySignals = useCallback((sig: SpySignals | null) => {
     setSpySignals(sig);
@@ -81,9 +88,15 @@ export default function App() {
     else localStorage.removeItem('yield_csv_signals');
   }, []);
 
-  // RSP/breadth CSV → replace breadth12mChg (persisted)
+  // RSP/breadth CSV → replace breadth12mChg (persisted; only valid when usedRatio=true)
   const [breadthSignals, setBreadthSignals] = useState<BreadthSignals | null>(() => {
-    try { const s = localStorage.getItem('breadth_csv_signals'); return s ? JSON.parse(s) : null; } catch { return null; }
+    try {
+      const s = localStorage.getItem('breadth_csv_signals');
+      if (!s) return null;
+      const parsed: BreadthSignals = JSON.parse(s);
+      if (!parsed.usedRatio) { localStorage.removeItem('breadth_csv_signals'); return null; }
+      return parsed;
+    } catch { return null; }
   });
   const handleBreadthSignals = useCallback((sig: BreadthSignals | null) => {
     setBreadthSignals(sig);
@@ -101,7 +114,9 @@ export default function App() {
     aaiiSpread:      aaii.spread,
     vixClose:        vixSignals?.vixClose ?? liveData?.vix?.value ?? CURRENT.vixClose,
     yieldCurve10y3m: yieldSignals?.yieldSpread   ?? CURRENT.yieldCurve10y3m,
-    breadth12mChg:   breadthSignals?.breadth12mChg ?? CURRENT.breadth12mChg,
+    // Only use breadth from CSV when the full RSP/SPY ratio was computed (needs both CSVs).
+    // RSP standalone return is on a different scale and must not feed a model trained on the ratio.
+    breadth12mChg: (breadthSignals?.usedRatio ? breadthSignals.breadth12mChg : null) ?? CURRENT.breadth12mChg,
   }), [spySignals, liveData, aaii, yieldSignals, breadthSignals]);
 
   const result     = useMemo(() => computeV2(rawInputs), [rawInputs]);
