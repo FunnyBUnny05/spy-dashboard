@@ -170,9 +170,9 @@ export default function App() {
       <UpdateBanner />
       <div className="header">
         <div className="header-left">
-          <h1>SPY COMPOSITE SCORING SYSTEM v5.4</h1>
+          <h1>SPY COMPOSITE SCORING SYSTEM v5.6</h1>
           <p>
-            Sign-constrained Ridge · 3 active signals (RSI, PPI, AAII) · {asOf}
+            Sign-constrained Ridge · 6 active signals (RSI, PPI, MDebt, AAII, Yield, Breadth) · {asOf}
             {' · '}
             <span className={liveStatus === 'ok' ? 'live-dot-ok' : liveStatus === 'error' ? 'live-dot-err' : 'live-dot-loading'}>
               {liveLabel}
@@ -286,9 +286,9 @@ export default function App() {
       </div>
 
       <footer>
-        SPY Composite v5.4 · Sign-constrained Ridge · {asOf} ·
-        Active: RSI, PPI, AAII (VIX excluded; MFI/EMA-dist/MDebt auto-pruned) ·
-        OOS ρ=0.598 · n=120 predictions · Not a forecast
+        SPY Composite v5.6 · Sign-constrained Ridge · {asOf} ·
+        Active: RSI, PPI, MDebt, AAII, Yield, Breadth (VIX excluded; MFI/EMA-dist auto-pruned) ·
+        Margin debt re-activated (coef=-0.018) · Not a forecast
       </footer>
     </>
   );

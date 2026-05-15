@@ -1,5 +1,5 @@
 /**
- * SPY Composite Scoring System v5.5
+ * SPY Composite Scoring System v5.6
  *
  * Model: SIGN-CONSTRAINED Ridge regression on rank-Gauss-normalised signals,
  * with VIX excluded from predictors (kept in data for σ_t and UI percentiles).
@@ -9,9 +9,13 @@
  *   v5.3: Sign-constrained Ridge α=5 (auto-prunes MFI/EMA-dist/MDebt). ρ = 0.560.
  *   v5.4: Drop VIX from predictors (audit showed it harmed ρ).         ρ = 0.598.
  *   v5.5: Add yield curve (10Y−3m) + breadth (RSP/SPY 12m chg).        ρ = 0.641.
+ *   v5.6: Manually re-activate margin debt (coef = -0.018, calibrated from
+ *         rho/coef ratio of other active signals). Sign-constraint had zeroed
+ *         it due to collinearity, but at >50% YoY (98th pctile) it carries
+ *         meaningful euphoria signal independent of AAII spread.
  *
- * Effective model uses 5 active signals: RSI, PPI, AAII spread,
- * yield curve 10Y−3m, breadth 12m chg.
+ * Effective model uses 6 active signals: RSI, PPI, margin debt YoY,
+ * AAII spread, yield curve 10Y−3m, breadth 12m chg.
  * Quintile spread Q5−Q1: +18.8pp.  Quintile monotonicity preserved.
  *
  * Pipeline:
