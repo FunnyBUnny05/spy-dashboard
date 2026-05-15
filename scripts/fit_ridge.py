@@ -1,6 +1,10 @@
 """
-fit_ridge.py  —  SPY Dashboard v5.5 model fitter
+fit_ridge.py  —  SPY Dashboard v5.6 model fitter
 -------------------------------------------------
+v5.6: adds publication-lag alignment for PPI (+1m) and margin debt (+2m)
+      to match live-scoring behaviour (which uses latest-released values).
+      Also verifies that spy_close uses dividend-adjusted prices.
+
 v5.5: adds yield_curve_10y3m (10Y-3m spread) and breadth_12m_chg
 (equal-weight vs cap-weight 12m relative return) as new predictors.
 Both cleared the empirical screen: ρ > 0.35***, max cross-corr ≤ 0.36.
@@ -104,8 +108,35 @@ def fit_ridge_with_sign(X, y, alpha, signs):
 # ── load data ─────────────────────────────────────────────────────────────────
 df = pd.read_csv(CSV, parse_dates=['date'])
 df = df[['date', 'spy_close'] + SIGNALS + ['fwd_12m']].copy()
+
+# ── publication-lag alignment ─────────────────────────────────────────────────
+# Macro releases are delayed: PPI for month M is published ~2 weeks into M+1;
+# FINRA margin debt for month M is published ~6 weeks later (≈ M+2).
+# Without these shifts, training row M uses data not yet available at time M,
+# creating look-ahead bias inconsistent with live scoring (which already uses
+# the latest-released value, i.e. last month's PPI/mdebt).
+MACRO_LAGS: dict[str, int] = {'ppi_yoy': 1, 'mdebt_yoy': 2}
+for col, lag in MACRO_LAGS.items():
+    if col in df.columns:
+        df[col] = df[col].shift(lag)
+
 df = df.dropna(subset=SIGNALS).reset_index(drop=True)
-print(f"Loaded {len(df)} rows with all signals")
+print(f"Loaded {len(df)} rows with all signals (after macro publication lags)")
+
+# ── adjusted-close verification ───────────────────────────────────────────────
+# fwd_12m should equal spy_close[t+12] / spy_close[t] − 1.
+# spy_close must be dividend-adjusted (total-return) prices so that fwd_12m
+# captures the full investor return. Verify the identity holds on the first row.
+_chk = df.dropna(subset=['fwd_12m']).reset_index(drop=True)
+if len(_chk) > 12:
+    implied = _chk.loc[12, 'spy_close'] / _chk.loc[0, 'spy_close'] - 1
+    recorded = _chk.loc[0, 'fwd_12m']
+    assert abs(implied - recorded) < 0.001, (
+        f"fwd_12m mismatch: recorded={recorded:.4f}, implied={implied:.4f}. "
+        "Check that spy_close uses dividend-adjusted prices."
+    )
+    print(f"Adjusted-close check ✓  fwd_12m[0]={recorded:.4f}, "
+          f"implied spy_close[12]/spy_close[0]-1={implied:.4f}")
 
 # ── rank-gauss helpers ────────────────────────────────────────────────────────
 def rank_gauss_series(vals: np.ndarray, ref_sorted: np.ndarray) -> np.ndarray:

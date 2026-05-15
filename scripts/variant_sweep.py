@@ -28,6 +28,10 @@ UNIVARIATE_SIGN = {
 
 df = pd.read_csv(CSV, parse_dates=['date'])
 df = df[['date', 'spy_close'] + SIGNALS + ['fwd_12m']].copy()
+# Publication-lag alignment — keeps training in sync with live scoring.
+for _col, _lag in {'ppi_yoy': 1, 'mdebt_yoy': 2}.items():
+    if _col in df.columns:
+        df[_col] = df[_col].shift(_lag)
 df = df.dropna(subset=SIGNALS).reset_index(drop=True)
 
 def rank_gauss_series(vals, ref_sorted):

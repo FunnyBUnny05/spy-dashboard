@@ -28,7 +28,12 @@ PREDICTORS = [s for s in SIGNALS if s != 'vix_close']
 ROOT = Path(__file__).resolve().parent.parent
 m = json.loads((ROOT / 'src/data/model.json').read_text())
 df = pd.read_csv('/tmp/velv/master_dataset.csv', parse_dates=['date'])
-df = df[['date', 'spy_close'] + SIGNALS + ['fwd_12m']].dropna(subset=SIGNALS).reset_index(drop=True)
+df = df[['date', 'spy_close'] + SIGNALS + ['fwd_12m']].copy()
+# Publication-lag alignment (mirrors fit_ridge.py): keeps audit in sync.
+for _col, _lag in {'ppi_yoy': 1, 'mdebt_yoy': 2}.items():
+    if _col in df.columns:
+        df[_col] = df[_col].shift(_lag)
+df = df.dropna(subset=SIGNALS).reset_index(drop=True)
 
 ts = m['timeseries']
 oos_rows = [r for r in ts if r.get('in_sample') is False]
