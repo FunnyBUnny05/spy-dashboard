@@ -92,9 +92,13 @@ export default function App() {
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     // Replace or append current month
     const filtered = base.filter(r => r.date !== currentMonth);
+    // Normalize SPX→SPY scale: historical data is in SPY price (~100-800).
+    // If the uploaded CSV is SPX (price >999), divide by 10 to match chart scale.
+    const rawPrice = spySignals?.priceLatest ?? CURRENT.spyPrice;
+    const chartPrice = rawPrice > 999 ? rawPrice / 10 : rawPrice;
     filtered.push({
       date:  currentMonth,
-      spy:   spySignals?.priceLatest ?? CURRENT.spyPrice,
+      spy:   chartPrice,
       score: result.compositeScore,
       pred:  result.predFwd12m,
       regime: result.regime,
