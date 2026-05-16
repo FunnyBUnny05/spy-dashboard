@@ -1,31 +1,41 @@
 /**
  * SPY Composite Scoring System v5.6
  *
- * Model: SIGN-CONSTRAINED Ridge regression on rank-Gauss-normalised signals,
- * with VIX excluded from predictors (kept in data for σ_t and UI percentiles).
+ * Model: SIGN-CONSTRAINED Ridge regression on rank-Gauss-normalised signals.
+ * VIX excluded from predictors (kept for σ_t and UI percentiles).
  *
  * Evolution:
  *   v5.2: Free Ridge + RG all 7. OOS ρ = 0.428.
  *   v5.3: Sign-constrained Ridge α=5 (auto-prunes MFI/EMA-dist/MDebt). ρ = 0.560.
  *   v5.4: Drop VIX from predictors (audit showed it harmed ρ).         ρ = 0.598.
  *   v5.5: Add yield curve (10Y−3m) + breadth (RSP/SPY 12m chg).        ρ = 0.641.
- *   v5.6: Manually re-activate margin debt (coef = -0.018, calibrated from
- *         rho/coef ratio of other active signals). Sign-constraint had zeroed
- *         it due to collinearity, but at >50% YoY (98th pctile) it carries
- *         meaningful euphoria signal independent of AAII spread.
+ *   v5.6: Retrain on fresh 2009–2026 FRED data (184 rows, was 168).    ρ = 0.480.
+ *         RSI zeroed again by sign-constraint. MFI technically active
+ *         but effectively zero (coef −0.00105, max contribution ±0.002
+ *         vs resid_std 0.105 — within noise). mdebt zeroed (not re-activated).
  *
- * Effective model uses 6 active signals: RSI, PPI, margin debt YoY,
- * AAII spread, yield curve 10Y−3m, breadth 12m chg.
- * Quintile spread Q5−Q1: +18.8pp.  Quintile monotonicity preserved.
+ * Active signals post-retrain (non-zero ridge coef):
+ *   MFI (−0.00105, ~noise), PPI (−0.03336), AAII (−0.06789),
+ *   Yield curve (−0.04609), Breadth (−0.01709).
+ *   Effective predictors with meaningful contribution: PPI, AAII, YC, Breadth.
+ *
+ * OOS ρ drop (0.641 → 0.480): 25% degradation. Likely contributors:
+ *   — 2022 inflation/rates regime now more heavily represented in sample.
+ *   — v5.5 ρ=0.641 may have had mild specification mining on the same 168 rows.
+ *   — 0.480 on a larger, more independent sample is probably the more honest number.
+ *   Run scripts/regime_split.py to check if coefs are regime-specific.
+ *
+ * Quintile monotonicity: Q4 mean (15.5%) < Q3 mean (16.7%) after retrain.
+ *   Likely sample noise given n_eff=3–4 in those buckets. Not a model failure.
  *
  * Pipeline:
  *   1. 9 input signals
  *   2. Rank-Gauss every signal against the full-sample sorted reference
  *   3. pred_fwd_12m = intercept + Σ ridge_coef_k * rg_k
- *      (4 of the 9 ridge_coefs are exactly 0 by sign-constraint)
+ *      (4–5 of the 9 ridge_coefs are exactly 0 by sign-constraint)
  *   4. Composite score = norm.cdf((pred − drift) / σ(VIX)) × 100
- *      where drift = full-sample mean fwd_12m, σ(VIX) is heteroscedastic
- *      σ²(t) = max(floor, a + b·vix_z(t)). score=50 ⇔ pred = drift.
+ *      where drift = full-sample mean fwd_12m (≈15%/yr, 2009–2026 sample).
+ *      score=50 ⇔ pred = drift.
  *   5. Empirical historical percentiles for all 9 signals.
  */
 
