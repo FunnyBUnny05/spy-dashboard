@@ -314,6 +314,7 @@ export interface BucketDef {
   ciHi: number;
   pctNeg: number;
   worst: number;
+  ciReliable: boolean;   // false when n_eff < 3 (NW SE unstable at this sample size)
 }
 
 export const BUCKETS: BucketDef[] = (modelData as any).buckets.map((b: any) => ({
@@ -321,6 +322,7 @@ export const BUCKETS: BucketDef[] = (modelData as any).buckets.map((b: any) => (
   n: b.n, nEff: b.n_eff,
   mean: b.mean, ciLo: b.ci_lo, ciHi: b.ci_hi,
   pctNeg: b.pct_neg, worst: b.worst,
+  ciReliable: (b.n_eff ?? 0) >= 3,
 }));
 
 export function bucketFor(score: number): BucketDef {
