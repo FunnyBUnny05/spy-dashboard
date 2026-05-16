@@ -428,8 +428,8 @@ export function getAAIIData(): { history: AAIIReading[]; stats: AAIIStats } {
 export function scoreAAII(history: AAIIReading[], stats: AAIIStats): AAIIResult {
   const reading = history[history.length - 1];
   const currentSpread = reading.stocks - reading.cash;
-  // Use frozen training-time mean/std so the displayed z-score matches the value
-  // the ridge model actually uses (both derived from the same rank-gauss reference).
+  // display-only z-score (mean/std normalization); the ridge model uses rank-Gauss
+  // for aaii_spread, not this value. The two transforms diverge at extremes.
   const zSpread = (currentSpread - MEANS['aaii_spread']) / STDS['aaii_spread'];
   const pctStocks = (history.filter(r => r.stocks < reading.stocks).length / history.length) * 100;
   const pctCash   = (history.filter(r => r.cash   < reading.cash  ).length / history.length) * 100;
