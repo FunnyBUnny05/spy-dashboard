@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Line } from 'react-chartjs-2';
-import { TsRow } from '../lib/scoring';
+import { TsRow, DRIFT_LABEL } from '../lib/scoring';
 import { tickStyle, gridStyle } from '../lib/chartSetup';
 
 interface Props {
@@ -148,7 +148,7 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
           <div className="stat-val" style={{ color: ftColor, marginTop: 8 }}>{ftLabel}</div>
           <div className="stat-sub">
             Score {compositeScore.toFixed(1)} → {Math.round(ftStance * 100)}% equity exposure<br />
-            Graduated exposure across 5 score buckets
+            <span style={{ fontSize: '0.75em', opacity: 0.6 }}>{DRIFT_LABEL}</span>
           </div>
         </div>
         <div className="card" style={{ flex: 1 }}>

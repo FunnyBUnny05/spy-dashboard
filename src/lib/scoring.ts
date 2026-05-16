@@ -84,6 +84,7 @@ const RIDGE_COEFS = (modelData as any).ridge_coefs as Record<string, number>;
 const RIDGE_INT   = (modelData as any).ridge_intercept as number;
 const RESID_STD   = (modelData as any).resid_std as number;
 const DRIFT       = (modelData as any).drift as number;
+export const DRIFT_LABEL = `score 50 = predicted return equal to ${(DRIFT * 100).toFixed(0)}%/yr (2009–2026 sample mean)`;
 
 // Heteroscedastic residual variance:  σ²(t) = max(floor, a + b · vix_z(t))
 const RESID_VAR_A     = ((modelData as any).resid_var_a     ?? RESID_STD * RESID_STD) as number;
