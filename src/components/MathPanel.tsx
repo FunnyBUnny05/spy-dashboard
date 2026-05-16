@@ -87,9 +87,8 @@ export function MathPanel({ signals, composite }: Props) {
         <div className="callout callout-info" style={{ marginTop: 16, fontSize: 11 }}>
           <strong>v5.6 methodology:</strong> Rank-Gauss normalise all 9 signals
           → sign-constrained Ridge (α={ALPHA}, fixed) on 8 predictors (VIX excluded as a predictor since OOS audit showed it harms ρ; still used for σ_t).
-          Coefficients forced to share sign with univariate ρ; constraint auto-prunes 2 redundant signals (MFI, EMA dist).
-          Margin debt manually re-activated (coef=−0.018) after sign-constraint zeroed it for collinearity — flagged as a manual prior.
-          Effective model uses 6 active signals: RSI, PPI, Margin Debt, AAII, Yield Curve, Breadth
+          Coefficients forced to share sign with univariate ρ; constraint auto-prunes 4 redundant signals (RSI, EMA dist, MDebt, VIX).
+          Effective model uses 5 active signals: MFI, PPI, AAII, Yield Curve, Breadth
           → pred_fwd_12m = intercept + Σ coef·z → composite score = Φ((pred − drift) / σ(VIX)) × 100.
           score=50 ⟺ pred equals historical drift ({(DRIFT*100).toFixed(1)}%).
           Residual std is heteroscedastic: σ²(t) = max(floor, {RESID_VAR_A.toFixed(4)} + {RESID_VAR_B >= 0 ? '+' : ''}{RESID_VAR_B.toFixed(4)}·vix_z).

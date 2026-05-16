@@ -40,7 +40,7 @@ export function HistoryPanel({ timeseries }: Props) {
       </div>
       <div className="callout callout-info">
         <strong>v5.6 sign-constrained Ridge model</strong> — solid line is walk-forward out-of-sample
-        (n=120, ρ=0.641). Dashed segments are <em>in-sample</em> scores from the final
+        (n=136, ρ=0.480). Dashed segments are <em>in-sample</em> scores from the final
         full-data model: the most recent ~12 months can't have realised 12m forward
         returns, so those points include the look-ahead they'd normally avoid. Treat
         the dashed tail with caution.

@@ -141,7 +141,7 @@ export function BucketsPanel({ currentBucket, predFwd12m, pi80Lo, pi80Hi, pi95Lo
           })}
         </div>
         <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 12 }}>
-          v5.6 sign-constrained Ridge · OOS Spearman ρ = 0.641 · α=5 · 6 active signals (RSI, PPI, MDebt, AAII, Yield, Breadth)
+          v5.6 sign-constrained Ridge · OOS Spearman ρ = 0.480 · α=5 · 5 active signals (MFI, PPI, AAII, Yield, Breadth)
         </div>
       </div>
     </div>
