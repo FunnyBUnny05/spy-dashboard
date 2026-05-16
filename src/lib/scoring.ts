@@ -121,6 +121,8 @@ function rgRefFor(sk: string): number[] {
 // older model.json files.
 const SIGNAL_SORTED = ((modelData as any).signal_sorted ?? {}) as Record<string, number[]>;
 
+// rho12m values below are from the pre-retrain training run (pre-45b5f44).
+// They are used for display only and have not been recomputed on the 184-row 2009–2026 sample.
 const SIGNAL_META: Record<string, { label: string; category: string; rho12m: number }> = {
   rsi_14m:           { label: 'RSI (14m)',             category: 'Momentum',          rho12m: -0.523 },
   mfi_14m:           { label: 'MFI (14m)',             category: 'Volume momentum',   rho12m: -0.341 },
