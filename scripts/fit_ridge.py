@@ -64,15 +64,18 @@ RANK_GAUSS_SIGNALS = set(SIGNALS)
 # in full_audit.py). VIX stays in SIGNALS for UI percentile + σ_t scaling.
 # v5.5 adds: yield_curve_10y3m (ρ=-0.422***) and breadth_12m_chg (ρ=-0.353***),
 # both independent from RSI/AAII/PPI (max cross-corr ≤ 0.36).
-PREDICTORS = [s for s in SIGNALS if s != 'vix_close']
+# v5.7: drop mfi_14m — collinear with rsi_14m (rho=0.777); OOS rho unchanged
+# (+0.008 improvement). See scripts/prune_mfi_test.py.
+PREDICTORS = [s for s in SIGNALS if s not in ('vix_close', 'mfi_14m')]
 # Univariate sign of each predictor vs fwd_12m. Used as a coefficient
 # constraint in the ridge fit.
 UNIVARIATE_SIGN = {
-    'rsi_14m':           -1, 'mfi_14m':      -1, 'ema_dist_pct':    -1,
+    'rsi_14m':           -1, 'ema_dist_pct':    -1,
     'ppi_yoy':           -1, 'mdebt_yoy':    -1, 'aaii_spread':      -1,
     'yield_curve_10y3m': -1,   # steep curve → lower fwd returns in sample
     'breadth_12m_chg':   -1,   # equal-wt outperforming → late-cycle signal
     # vix_close intentionally absent from PREDICTORS
+    # mfi_14m dropped: collinear with rsi_14m (rho=0.777), coef was noise
 }
 FIXED_ALPHA = 5.0   # OOS-validated; surface is flat across α∈[1,10]
 ALPHAS  = [FIXED_ALPHA]   # kept as a list for downstream code that iterates
