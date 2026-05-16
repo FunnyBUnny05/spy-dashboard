@@ -189,9 +189,11 @@ function rankGauss(value: number, sorted: number[]): number {
   return normInv(p);
 }
 
-/** Historical percentile (0–100) using the sorted reference array */
+/** Historical percentile (0–100) using the sorted reference array.
+ *  Mid-rank formula (rank + 0.5)/n avoids 0 for the minimum and 100 for the
+ *  maximum, matching the unbiased estimator used in rankGauss. */
 function historicalPctile(value: number, sorted: number[]): number {
-  return (sortedRank(sorted, value) / sorted.length) * 100;
+  return ((sortedRank(sorted, value) + 0.5) / sorted.length) * 100;
 }
 
 // Empirical sorted arrays per signal — prefer real history, fall back to a
@@ -312,7 +314,9 @@ export const BUCKETS: BucketDef[] = (modelData as any).buckets.map((b: any) => (
 }));
 
 export function bucketFor(score: number): BucketDef {
-  return BUCKETS.find(b => score >= b.lo && score < b.hi + 0.01) ?? BUCKETS[BUCKETS.length - 1];
+  // Use strict < hi so exact quintile edges (20, 40, 60, 80) go to the higher bucket,
+  // consistent with tteForScore's Math.floor(score/20). score=100 falls to last via ??.
+  return BUCKETS.find(b => score >= b.lo && score < b.hi) ?? BUCKETS[BUCKETS.length - 1];
 }
 
 // ── Time-to-event (historical median months until SPY moved by ±X%) ──────────
@@ -408,18 +412,19 @@ export function getAAIIData(): { history: AAIIReading[]; stats: AAIIStats } {
 
 export function scoreAAII(history: AAIIReading[], stats: AAIIStats): AAIIResult {
   const reading = history[history.length - 1];
-  const spreadValues = history.map(r => r.stocks - r.cash);
-  const spreadMean = spreadValues.reduce((a, b) => a + b, 0) / spreadValues.length;
-  const spreadStd  = Math.sqrt(spreadValues.reduce((a, b) => a + (b - spreadMean) ** 2, 0) / (spreadValues.length - 1));
   const currentSpread = reading.stocks - reading.cash;
-  const zSpread  = (currentSpread - spreadMean) / spreadStd;
+  // Use frozen training-time mean/std so the displayed z-score matches the value
+  // the ridge model actually uses (both derived from the same rank-gauss reference).
+  const zSpread = (currentSpread - MEANS['aaii_spread']) / STDS['aaii_spread'];
   const pctStocks = (history.filter(r => r.stocks < reading.stocks).length / history.length) * 100;
   const pctCash   = (history.filter(r => r.cash   < reading.cash  ).length / history.length) * 100;
   const score = Math.max(0, Math.min(100, 50 - zSpread * 25));
   const flag = zSpread > 1.5 ? 'extreme-greed' : zSpread > 0.75 ? 'greed' : zSpread < -1.5 ? 'extreme-fear' : zSpread < -0.75 ? 'fear' : 'neutral';
   const flagLabel = zSpread > 1.5 ? 'Extreme retail euphoria — contrarian SELL' : zSpread > 0.75 ? 'Retail crowded long — caution' : zSpread < -1.5 ? 'Extreme retail fear — contrarian BUY' : zSpread < -0.75 ? 'Retail defensive — opportunity' : 'Allocations near norms';
+  // Anchor stale-days to day 1 of the month; AAII dates are stored as YYYY-MM
+  // (day stripped), so day-28 could give a negative staleDays mid-month.
   const [yy, mm] = reading.date.split('-').map(Number);
-  const staleDays = Math.floor((Date.now() - new Date(yy, mm - 1, 28).getTime()) / 86400000);
+  const staleDays = Math.floor((Date.now() - new Date(yy, mm - 1, 1).getTime()) / 86400000);
   const raw  = `${(reading.stocks * 100).toFixed(1)}% stocks · ${(reading.cash * 100).toFixed(1)}% cash`;
   const desc = `Z-spread ${zSpread >= 0 ? '+' : ''}${zSpread.toFixed(2)} · ${pctStocks.toFixed(0)}th pct stocks`;
   return { reading, stats, zSpread, pctStocks, pctCash, spread: currentSpread, score, flag, flagLabel, raw, desc, staleDays };

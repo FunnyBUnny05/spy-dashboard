@@ -217,7 +217,8 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
       {/* Live metrics table */}
       <div className="chart-box" style={{ marginTop: 12 }}>
         <div className="chart-title">
-          <span>Live metrics — computed from timeseries above (all scored months)</span>
+          <span>Live metrics — computed from timeseries above (all scored months, <em>includes in-sample look-ahead</em>)</span>
+          <span style={{ color: 'var(--warn)', fontSize: 10 }}>⚠ Overstates skill — use Audit v2 table below for verified OOS numbers</span>
         </div>
         <table>
           <thead>

@@ -39,9 +39,10 @@ export function scorePpi(data: PpiData): PpiSignal {
   }
   const yoy = yoyPoint.yoy ?? 0;
 
-  // 3-month annualized from last 3 MoM values
+  // 3-month annualized from last 3 MoM values — compound formula
   const recentMom = pts.slice(-3).map(p => p.mom ?? 0);
-  const ann3m = recentMom.reduce((a, b) => a + b, 0) / recentMom.length * 12;
+  const meanMom = recentMom.reduce((a, b) => a + b, 0) / recentMom.length;
+  const ann3m = ((1 + meanMom / 100) ** 12 - 1) * 100;
 
   // Acceleration: compare last 3m avg to prior 3m avg
   const priorMom = pts.slice(-6, -3).map(p => p.mom ?? 0);

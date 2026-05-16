@@ -20,7 +20,7 @@ export function BucketsPanel({ currentBucket, predFwd12m, pi80Lo, pi80Hi, pi95Lo
       <div>
         <div className="chart-box">
           <div className="chart-title">
-            <span>Walk-forward sign-constrained Ridge forecast (v5.4, n=120)</span>
+            <span>Walk-forward sign-constrained Ridge forecast (v5.6, n=120)</span>
             <span style={{ color: 'var(--text3)', fontSize: 10 }}>quintile buckets · Newey-West HAC CI · 80/95% PI scaled by VIX</span>
           </div>
 
@@ -106,7 +106,7 @@ export function BucketsPanel({ currentBucket, predFwd12m, pi80Lo, pi80Hi, pi95Lo
         </div>
         <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 6, lineHeight: 1.45 }}>
           <strong>*</strong> Sparse buckets (n &lt; 5): the model rarely emits scores at the extremes
-          under the v5.4 sign-constrained ridge (α=5), so Q1 and Q5 may be thinly populated.
+          under the v5.6 sign-constrained ridge (α=5), so Q1 and Q5 may be thinly populated.
           This is a property of the prediction distribution, not a fixable defect.
         </div>
       </div>
@@ -141,7 +141,7 @@ export function BucketsPanel({ currentBucket, predFwd12m, pi80Lo, pi80Hi, pi95Lo
           })}
         </div>
         <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 12 }}>
-          v5.4 sign-constrained Ridge · OOS Spearman ρ = 0.598 · residual std = 10.9% · α=5 · 3 active predictors (RSI, PPI, AAII)
+          v5.6 sign-constrained Ridge · OOS Spearman ρ = 0.641 · α=5 · 6 active signals (RSI, PPI, MDebt, AAII, Yield, Breadth)
         </div>
       </div>
     </div>

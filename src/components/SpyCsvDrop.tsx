@@ -1,14 +1,15 @@
 /**
- * SpyCsvDrop — drag-and-drop zone for SPY weekly OHLCV CSV data.
+ * SpyCsvDrop — drag-and-drop zone for SPY monthly OHLCV CSV data.
  *
  * Accepted formats:
  *   TradingView export:  time,open,high,low,close,volume
  *   Yahoo Finance:       Date,Open,High,Low,Close,Adj Close,Volume
  *
- * TradingView: Chart → right-click price history → Export chart data (CSV)
- *   Make sure the chart is set to Weekly timeframe before exporting.
+ * TradingView: Chart → set timeframe to 1M → right-click any candle → Export chart data (CSV)
+ * Yahoo Finance: Historical Data → set frequency to Monthly → Download
  *
- * Computes: RSI-14, EMA-50W (Trend), OBV, MFI-14
+ * Monthly bars match the training data: RSI(14) = 14-month RSI, EMA(12) = 12-month EMA.
+ * Computes: RSI-14m, EMA-12m (Trend), OBV-3m, MFI-14m
  */
 
 import { useState, useCallback, DragEvent, ChangeEvent } from 'react';
@@ -24,8 +25,8 @@ export interface SpyRow {
 
 export interface SpySignals {
   rsi14: number;
-  ema50w: number;    // ratio: price / EMA50W
-  obv3m: number;     // 3-month OBV % change vs price % change
+  ema12m: number;    // (price − EMA12m) / EMA12m × 100
+  obv3m: number;     // 3-month OBV divergence: net signed volume % minus price %
   mfi14: number;
   asOf: string;
   priceLatest: number;
@@ -58,7 +59,7 @@ function calcRSI(closes: number[], period = 14): number {
     gains.push(d > 0 ? d : 0);
     losses.push(d < 0 ? -d : 0);
   }
-  // Wilder smoothing
+  // Wilder smoothing — needs full history for seed washout
   let avgGain = gains.slice(0, period).reduce((a, b) => a + b, 0) / period;
   let avgLoss = losses.slice(0, period).reduce((a, b) => a + b, 0) / period;
   for (let i = period; i < gains.length; i++) {
@@ -84,42 +85,47 @@ function calcMFI(rows: SpyRow[], period = 14): number {
   return 100 - 100 / (1 + posFlow / negFlow);
 }
 
-function calcOBVDivergence(rows: SpyRow[], lookback = 13): number {
-  // Compare OBV % change to price % change over lookback weeks
+function calcOBVDivergence(rows: SpyRow[], lookback = 3): number {
+  // OBV divergence over lookback months: net signed volume as % of total volume,
+  // minus price % change. Negative = volume lagging price = distribution = bearish.
   if (rows.length < lookback + 1) return 0;
   const window = rows.slice(-(lookback + 1));
-  let obv = 0;
-  const obvSeries: number[] = [0];
+  let netObv = 0;
+  let totalVol = 0;
   for (let i = 1; i < window.length; i++) {
-    obv += window[i].close > window[i - 1].close ? window[i].volume
-         : window[i].close < window[i - 1].close ? -window[i].volume : 0;
-    obvSeries.push(obv);
+    const vol = window[i].volume;
+    netObv += window[i].close > window[i - 1].close ? vol
+            : window[i].close < window[i - 1].close ? -vol : 0;
+    totalVol += vol;
   }
-  const obvPctChange = (obvSeries[obvSeries.length - 1] / (Math.abs(obvSeries[1]) || 1)) * 100;
-  const pricePctChange = ((window[window.length - 1].close - window[1].close) / window[1].close) * 100;
-  return obvPctChange - pricePctChange; // negative = OBV lagging price = bearish
+  if (totalVol === 0) return 0;
+  const obvPct = (netObv / totalVol) * 100; // -100 to +100
+  const pricePct = ((window[window.length - 1].close - window[0].close) / window[0].close) * 100;
+  return obvPct - pricePct;
 }
 
+const MIN_MONTHS = 24; // need at least 2 years for meaningful EMA-12 and RSI-14
+
 export function computeSpySignals(rows: SpyRow[]): SpySignals | null {
-  if (rows.length < 52) return null;
+  if (rows.length < MIN_MONTHS) return null;
   const closes = rows.map(r => r.close);
   const latest = rows[rows.length - 1];
 
-  const ema50Series = calcEMA(closes, 50);
-  const ema50 = ema50Series[ema50Series.length - 1];
-  const ema50Ratio = ((latest.close - ema50) / ema50) * 100;
+  const ema12Series = calcEMA(closes, 12);
+  const ema12 = ema12Series[ema12Series.length - 1];
+  const ema12Ratio = ((latest.close - ema12) / ema12) * 100;
 
-  const rsi14 = calcRSI(closes.slice(-30)); // use last 30 for speed, enough history
+  const rsi14 = calcRSI(closes);
   const mfi14 = calcMFI(rows);
   const obvDiv = calcOBVDivergence(rows);
 
-  // 12m return: compare latest close to close ~52 weekly bars ago
-  const price52wAgo = rows[rows.length - 53]?.close ?? rows[0].close;
-  const return12m = ((latest.close - price52wAgo) / price52wAgo) * 100;
+  // 12m return: compare latest close to close 12 monthly bars ago
+  const price12mAgo = rows[rows.length - 13]?.close ?? rows[0].close;
+  const return12m = ((latest.close - price12mAgo) / price12mAgo) * 100;
 
   return {
     rsi14,
-    ema50w: ema50Ratio,
+    ema12m: ema12Ratio,
     obv3m: obvDiv,
     mfi14,
     asOf: latest.date,
@@ -132,12 +138,12 @@ export function computeSpySignals(rows: SpyRow[]): SpySignals | null {
 // ── Scores from signals ───────────────────────────────────────────────────────
 
 export function scoreFromSpySignals(sig: SpySignals) {
-  // RSI: 0→100 score; >70 overbought (bearish), <30 oversold (bullish)
+  // RSI-14m: >70 overbought (bearish), <30 oversold (bullish)
   const rsiScore = sig.rsi14 > 80 ? 10 : sig.rsi14 > 70 ? 30 : sig.rsi14 > 60 ? 50
     : sig.rsi14 > 50 ? 60 : sig.rsi14 > 40 ? 70 : sig.rsi14 > 30 ? 80 : 90;
 
-  // Trend (EMA50W ratio %): very extended = bearish
-  const t = sig.ema50w;
+  // EMA-12m dist %: very extended above 12m EMA = bearish
+  const t = sig.ema12m;
   const trendScore = t > 30 ? 10 : t > 20 ? 20 : t > 15 ? 35 : t > 10 ? 45
     : t > 5 ? 60 : t > 0 ? 70 : t > -10 ? 75 : 85;
 
@@ -145,7 +151,7 @@ export function scoreFromSpySignals(sig: SpySignals) {
   const o = sig.obv3m;
   const obvScore = o < -15 ? 10 : o < -8 ? 20 : o < -3 ? 40 : o < 3 ? 55 : o < 10 ? 70 : 80;
 
-  // MFI: <20 oversold (bullish), >80 overbought (bearish)
+  // MFI-14m: >80 overbought (bearish), <20 oversold (bullish)
   const mfiScore = sig.mfi14 > 80 ? 15 : sig.mfi14 > 70 ? 30 : sig.mfi14 > 60 ? 45
     : sig.mfi14 > 40 ? 55 : sig.mfi14 > 30 ? 70 : 85;
 
@@ -159,7 +165,6 @@ function normalizeDate(raw: string): string {
   if (/^\d{9,11}$/.test(raw.trim())) {
     return new Date(parseInt(raw) * 1000).toISOString().slice(0, 10);
   }
-  // Already YYYY-MM-DD or similar — return as-is
   return raw.trim();
 }
 
@@ -169,18 +174,17 @@ function parseCSV(text: string): SpyRow[] {
   const header = lines[0].toLowerCase().split(',').map(h => h.trim().replace(/"/g, ''));
 
   const idx = {
-    // TradingView uses "time"; Yahoo uses "date"
     date:     header.findIndex(h => h === 'time' || h === 'date'),
     open:     header.findIndex(h => h === 'open'),
     high:     header.findIndex(h => h === 'high'),
     low:      header.findIndex(h => h === 'low'),
-    // prefer "adj close" (Yahoo) over plain "close"; TradingView has only "close"
     adjClose: header.findIndex(h => h.includes('adj')),
     close:    header.findIndex(h => h === 'close'),
     volume:   header.findIndex(h => h.includes('vol')),
   };
 
-  const closeCol = idx.adjClose >= 0 ? idx.adjClose : idx.close;
+  const useAdj = idx.adjClose >= 0;
+  const closeCol = useAdj ? idx.adjClose : idx.close;
   if (idx.date < 0 || closeCol < 0) {
     throw new Error('Could not find Date/Time and Close columns. Make sure the CSV has a header row.');
   }
@@ -190,17 +194,37 @@ function parseCSV(text: string): SpyRow[] {
     const cols = lines[i].split(',').map(c => c.trim().replace(/"/g, ''));
     const close = parseFloat(cols[closeCol]);
     if (isNaN(close) || close <= 0) continue;
+    // Scale H/L/O by the adj factor so typical price used in MFI is internally consistent
+    let adjFactor = 1;
+    if (useAdj && idx.close >= 0) {
+      const rawClose = parseFloat(cols[idx.close]);
+      if (!isNaN(rawClose) && rawClose > 0) adjFactor = close / rawClose;
+    }
     rows.push({
       date:   normalizeDate(cols[idx.date]),
-      open:   idx.open   >= 0 ? parseFloat(cols[idx.open])   : close,
-      high:   idx.high   >= 0 ? parseFloat(cols[idx.high])   : close,
-      low:    idx.low    >= 0 ? parseFloat(cols[idx.low])     : close,
+      open:   idx.open   >= 0 ? parseFloat(cols[idx.open])   * adjFactor : close,
+      high:   idx.high   >= 0 ? parseFloat(cols[idx.high])   * adjFactor : close,
+      low:    idx.low    >= 0 ? parseFloat(cols[idx.low])     * adjFactor : close,
       close,
-      volume: idx.volume >= 0 ? parseFloat(cols[idx.volume])  : 0,
+      volume: idx.volume >= 0 ? parseFloat(cols[idx.volume]) : 0,
     });
   }
   if (rows.length < 2) throw new Error('No valid rows found in CSV');
   rows.sort((a, b) => a.date.localeCompare(b.date));
+
+  // Reject daily or weekly data — monthly bars should average ~28–31 days apart
+  if (rows.length >= 4) {
+    const spanDays = (new Date(rows[rows.length - 1].date).getTime() - new Date(rows[0].date).getTime()) / 86400000;
+    const avgDaysPerBar = spanDays / (rows.length - 1);
+    if (avgDaysPerBar < 20) {
+      const granularity = avgDaysPerBar < 3 ? 'daily' : 'weekly';
+      throw new Error(
+        `This looks like ${granularity} data (avg ${avgDaysPerBar.toFixed(0)} days/bar). ` +
+        `Please set the chart timeframe to 1M (monthly) before exporting.`
+      );
+    }
+  }
+
   return rows;
 }
 
@@ -226,13 +250,15 @@ export function SpyCsvDrop({ onSignals, initialSignals }: Props) {
     reader.onload = (e) => {
       try {
         const rows = parseCSV(e.target?.result as string);
-        if (rows.length < 52) throw new Error(`Need at least 52 rows (got ${rows.length}). Use weekly SPY data.`);
+        if (rows.length < MIN_MONTHS) {
+          throw new Error(`Need at least ${MIN_MONTHS} monthly bars (got ${rows.length}). Export more history.`);
+        }
         const sig = computeSpySignals(rows);
         if (!sig) throw new Error('Could not compute signals');
         setSignals(sig);
         onSignals(sig);
         setStatus('ok');
-        setMessage(`Loaded ${rows.length} weekly bars — signals computed through ${sig.asOf}`);
+        setMessage(`Loaded ${rows.length} monthly bars — signals computed through ${sig.asOf}`);
       } catch (err) {
         setStatus('error');
         setMessage((err as Error).message);
@@ -259,17 +285,21 @@ export function SpyCsvDrop({ onSignals, initialSignals }: Props) {
   return (
     <div className="csv-panel">
       <div className="csv-intro">
-        <h3>SPY Weekly Data</h3>
+        <h3>SPY Monthly Data</h3>
         <p>
-          Drop a weekly SPY CSV below to compute MFI, Trend/EMA50W, OBV, and RSI live.
+          Drop a <strong>monthly</strong> SPY CSV to compute RSI-14m, EMA-12m, MFI-14m, and OBV live.
+          Monthly bars match the training data — RSI(14) here means 14 months, same as the model.
         </p>
         <p>
-          <strong>TradingView:</strong> Open SPY chart → set timeframe to <strong>1W</strong> →
-          right-click on any candle → <em>Export chart data…</em> → Save as CSV.
+          <strong>TradingView:</strong> Open SPY chart → set timeframe to <strong>1M</strong> →
+          right-click any candle → <em>Export chart data…</em> → Save as CSV.
+        </p>
+        <p>
+          <strong>Yahoo Finance:</strong> SPY Historical Data → Frequency: <strong>Monthly</strong> → Download.
         </p>
         <p>
           Expected columns: <code>time, open, high, low, close, volume</code>
-          &nbsp;(Yahoo Finance format also accepted)
+          &nbsp;(Yahoo Finance "Adj Close" format also accepted)
         </p>
       </div>
 
@@ -289,7 +319,7 @@ export function SpyCsvDrop({ onSignals, initialSignals }: Props) {
         <label htmlFor="spy-csv-input" className="csv-drop-label">
           {status === 'ok' ? '✓ ' : status === 'error' ? '✗ ' : '↓ '}
           {status === 'idle' || status === 'hover'
-            ? 'Drop SPY weekly CSV here or click to browse'
+            ? 'Drop SPY monthly CSV here or click to browse'
             : message}
         </label>
       </div>
@@ -297,32 +327,32 @@ export function SpyCsvDrop({ onSignals, initialSignals }: Props) {
       {signals && scores && (
         <div className="csv-results">
           <div className="csv-meta">
-            {signals.rows} weekly bars · SPY ${signals.priceLatest.toFixed(2)} · through {signals.asOf}
+            {signals.rows} monthly bars · SPY ${signals.priceLatest.toFixed(2)} · through {signals.asOf}
           </div>
           <div className="csv-signals">
             <div className="csv-signal-row">
-              <span className="csv-sig-label">MFI (14w)</span>
+              <span className="csv-sig-label">MFI (14m)</span>
               <span className="csv-sig-value">{signals.mfi14.toFixed(1)}</span>
               <span className="csv-sig-score" style={{ color: scores.mfiScore < 40 ? 'var(--bear)' : scores.mfiScore > 65 ? 'var(--bull)' : 'var(--text)' }}>
                 score {scores.mfiScore}
               </span>
             </div>
             <div className="csv-signal-row">
-              <span className="csv-sig-label">Trend / EMA50W</span>
-              <span className="csv-sig-value">{signals.ema50w >= 0 ? '+' : ''}{signals.ema50w.toFixed(2)}%</span>
+              <span className="csv-sig-label">Trend / EMA-12m</span>
+              <span className="csv-sig-value">{signals.ema12m >= 0 ? '+' : ''}{signals.ema12m.toFixed(2)}%</span>
               <span className="csv-sig-score" style={{ color: scores.trendScore < 40 ? 'var(--bear)' : scores.trendScore > 65 ? 'var(--bull)' : 'var(--text)' }}>
                 score {scores.trendScore}
               </span>
             </div>
             <div className="csv-signal-row">
-              <span className="csv-sig-label">OBV divergence</span>
+              <span className="csv-sig-label">OBV divergence (3m)</span>
               <span className="csv-sig-value">{signals.obv3m >= 0 ? '+' : ''}{signals.obv3m.toFixed(1)}%</span>
               <span className="csv-sig-score" style={{ color: scores.obvScore < 40 ? 'var(--bear)' : scores.obvScore > 65 ? 'var(--bull)' : 'var(--text)' }}>
                 score {scores.obvScore}
               </span>
             </div>
             <div className="csv-signal-row">
-              <span className="csv-sig-label">RSI (14w)</span>
+              <span className="csv-sig-label">RSI (14m)</span>
               <span className="csv-sig-value">{signals.rsi14.toFixed(1)}</span>
               <span className="csv-sig-score" style={{ color: scores.rsiScore < 40 ? 'var(--bear)' : scores.rsiScore > 65 ? 'var(--bull)' : 'var(--text)' }}>
                 score {scores.rsiScore}
@@ -330,7 +360,7 @@ export function SpyCsvDrop({ onSignals, initialSignals }: Props) {
             </div>
           </div>
           <p className="csv-note">
-            These scores override the static snapshot values in the composite when a CSV is loaded.
+            These signals override the static snapshot values in the composite when a CSV is loaded.
           </p>
         </div>
       )}

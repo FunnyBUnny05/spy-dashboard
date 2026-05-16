@@ -21,11 +21,12 @@ function findHistoricalExtremes(history: AAIIReading[], threshold: number) {
   const extremes: { date: string; z: number; stocks: number; cash: number; type: 'greed' | 'fear' }[] = [];
   for (let i = 0; i < history.length; i++) {
     if (Math.abs(zs[i]) >= threshold) {
-      // Only mark turning points (local extreme): z is more extreme than +/- 1 month
-      const prev = i > 0 ? zs[i - 1] : 0;
-      const next = i < zs.length - 1 ? zs[i + 1] : 0;
-      const isLocalMax = zs[i] > 0 && zs[i] >= prev && zs[i] >= next;
-      const isLocalMin = zs[i] < 0 && zs[i] <= prev && zs[i] <= next;
+      // Only mark turning points (local extreme): z is more extreme than all ±3-month neighbours.
+      // A 1-month window misses plateaus where neither point strictly exceeds the other.
+      const WINDOW = 3;
+      const neighbours = zs.slice(Math.max(0, i - WINDOW), i).concat(zs.slice(i + 1, i + WINDOW + 1));
+      const isLocalMax = zs[i] > 0 && neighbours.every(n => zs[i] >= n);
+      const isLocalMin = zs[i] < 0 && neighbours.every(n => zs[i] <= n);
       if (isLocalMax || isLocalMin) {
         extremes.push({
           date: history[i].date,
@@ -204,9 +205,9 @@ export function AAIIPanel({ aaii, history }: Props) {
         {aaii.pctStocks.toFixed(0)}th percentile), Cash {(aaii.reading.cash * 100).toFixed(1)}% (
         {aaii.pctCash.toFixed(0)}th percentile), Z-spread {aaii.zSpread >= 0 ? '+' : ''}
         {aaii.zSpread.toFixed(2)}σ. {aaii.flagLabel}.
-        {' '}Sub-score: <strong>{aaii.score.toFixed(0)}/100</strong>. With a 10% weight in the
-        composite, this contributes <strong>{(aaii.score * 0.10).toFixed(2)} pts</strong> to the
-        total. <em>Important caveat:</em> AAII is one of the noisier sentiment signals. Use it as
+        {' '}Sub-score: <strong>{aaii.score.toFixed(0)}/100</strong> (display gauge only — the composite
+        uses the rank-Gauss-normalised spread directly via the Ridge, not a weighted sub-score).
+        {' '}<em>Important caveat:</em> AAII is one of the noisier sentiment signals. Use it as
         confirmation alongside Margin Debt and Buffett — not as a standalone trigger.
       </div>
     </>

@@ -58,7 +58,10 @@ export default function App() {
       const s = localStorage.getItem('spy_csv_signals');
       if (!s) return null;
       const parsed: SpySignals = JSON.parse(s);
-      if (parsed.return12m == null) { localStorage.removeItem('spy_csv_signals'); return null; }
+      // Migrate: old entries had ema50w (weekly) instead of ema12m (monthly) — discard them.
+      if (parsed.return12m == null || parsed.ema12m == null) {
+        localStorage.removeItem('spy_csv_signals'); return null;
+      }
       return parsed;
     } catch { return null; }
   });
@@ -108,7 +111,7 @@ export default function App() {
   const rawInputs: RawSignalValues = useMemo(() => ({
     rsi14m:          spySignals?.rsi14   ?? CURRENT.rsi14m,
     mfi14m:          spySignals?.mfi14   ?? CURRENT.mfi14m,
-    emaDistPct:      spySignals?.ema50w  ?? CURRENT.emaDistPct,
+    emaDistPct:      spySignals?.ema12m  ?? CURRENT.emaDistPct,
     ppiYoy:          liveData?.ppi.latest.yoy          ?? CURRENT.ppiYoy,
     mdebtYoy:        liveData?.margin.latest.yoy_growth ?? CURRENT.mdebtYoy,
     aaiiSpread:      aaii.spread,
@@ -207,7 +210,7 @@ export default function App() {
           <Gauge
             score={result.compositeScore}
             asOf={asOf}
-            signalCount={7}
+            signalCount={9}
           />
           <ForwardReturns bucket={result.bucket} score={result.compositeScore} />
           <AAIICard aaii={aaii} />
@@ -218,7 +221,7 @@ export default function App() {
         <div className="section-hdr">
           Seven signals — value · historical percentile · correlation with 12m forward return
           {liveStatus === 'ok' && <span className="live-badge"> PPI · Margin Debt{liveData?.vix ? ' · VIX' : ''} live</span>}
-          {spySignals     && <span className="live-badge"> RSI · MFI · Trend from SPX CSV</span>}
+          {spySignals     && <span className="live-badge"> RSI · MFI · Trend from monthly SPY CSV</span>}
           {vixSignals     && <span className="live-badge"> VIX from CSV</span>}
           {yieldSignals   && <span className="live-badge"> Yield curve from CSV</span>}
           {breadthSignals && <span className="live-badge"> Breadth from RSP CSV</span>}
