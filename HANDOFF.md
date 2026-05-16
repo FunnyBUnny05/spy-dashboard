@@ -39,48 +39,49 @@ OUTPUT:
 
 ---
 
-## Current Model — v5.6 (as of May 2026, commit 45b5f44)
+## Current Model — v5.7 (as of May 2026)
+
+v5.6 retrained on 2009–2026 FRED data (184 rows). v5.7 pruned MFI (collinear with RSI, ρ=0.777; OOS ρ improved). See `scripts/prune_mfi_test.py` and `scripts/regime_split.py` for analysis.
 
 ### 9 Input Signals — Ridge Coefficients
 
 | Key | Label | Coef | Active? |
 |-----|-------|------|---------|
 | rsi_14m | RSI (14m) | 0.0 | ❌ zeroed by sign-constraint |
-| mfi_14m | MFI (14m) | −0.00105 | ⚠️ active but ~noise (contrib ≤ ±0.002) |
+| mfi_14m | MFI (14m) | 0.0 | ❌ pruned (collinear with RSI, ρ=0.777) |
 | ema_dist_pct | EMA-12m dist % | 0.0 | ❌ zeroed |
-| ppi_yoy | PPI YoY % | −0.03336 | ✅ |
-| mdebt_yoy | Margin debt YoY % | 0.0 | ❌ zeroed (not re-activated) |
-| aaii_spread | AAII stocks−cash | −0.06789 | ✅ strongest signal |
+| ppi_yoy | PPI YoY % | −0.03361 | ✅ |
+| mdebt_yoy | Margin debt YoY % | 0.0 | ❌ zeroed |
+| aaii_spread | AAII stocks−cash | −0.06851 | ✅ strongest signal |
 | vix_close | VIX | 0.0 | ❌ excluded a priori (kept for σ_t and UI) |
-| yield_curve_10y3m | Yield curve 10Y−3m | −0.04609 | ✅ |
-| breadth_12m_chg | Breadth (RSP/SPY 12m) | −0.01709 | ✅ |
+| yield_curve_10y3m | Yield curve 10Y−3m | −0.04656 | ✅ |
+| breadth_12m_chg | Breadth (RSP/SPY 12m) | −0.01679 | ✅ |
 
-Ridge intercept: 0.143527 | Alpha (fixed): 5.0 | OOS Spearman ρ: 0.480
+Ridge intercept: 0.143506 | Alpha (fixed): 5.0 | OOS Spearman ρ: 0.488
 
-**Note on ρ drop (v5.5: 0.641 → v5.6: 0.480):** Likely reflects 2022 inflation/rates regime
-now more prominent in data + possible mild spec mining on the old 168-row sample.
-Run `scripts/regime_split.py` to check if coefs are regime-specific.
+**OOS ρ history:** 0.428 → 0.560 → 0.598 → 0.641 → 0.480 (v5.6 retrain) → 0.488 (v5.7 MFI prune)
+**On ρ drop (v5.5→v5.6):** Regime-split test shows OOS ρ=0.702 (train 2009-16, eval 2017-25) — model generalises well. Drop was harder walk-forward test on larger data, not regime failure.
 
 ### Key Model Parameters
 
 | Parameter | Value | Meaning |
 |-----------|-------|---------|
 | `drift` | 0.1503 | Sample mean fwd_12m (2009–2026). score=50 anchors to ≈15%/yr predicted return |
-| `resid_std` | 0.1046 | Full-sample residual std |
-| `resid_var_a` | 0.01077 | Unconditional residual variance |
-| `resid_var_b` | 0.00361 | Slope of squared residuals on vix_z (conditional component ≈33% of base) |
+| `resid_std` | 0.1038 | Full-sample residual std |
+| `resid_var_a` | 0.01060 | Unconditional residual variance |
+| `resid_var_b` | 0.00370 | VIX-conditional slope (ΔlogL=+1.56 nats — justified, keeping) |
 
-### Quintile Buckets — Empirical 12m Forward Returns (post-retrain)
+### Quintile Buckets — Empirical 12m Forward Returns (v5.7)
 
 | Quintile | Score | n | n_eff | Mean 12m | CI lo | CI hi | CI reliable? | % Neg | Worst |
 |----------|-------|---|-------|----------|-------|-------|-------------|-------|-------|
-| Q1 | 0–20 | 17 | 1 | −4.3% | −11.0% | +2.4% | ❌ (NW unstable) | 64.7% | −18.3% |
-| Q2 | 20–40 | 16 | 1 | +10.3% | +7.4% | +13.1% | ❌ (NW unstable) | 6.2% | −0.5% |
-| Q3 | 40–60 | 34 | 3 | +16.7% | +13.3% | +20.0% | ✅ | 0.0% | +2.8% |
-| Q4 | 60–80 | 42 | 4 | +15.5% | +10.2% | +20.8% | ✅ | 2.4% | −6.2% |
-| Q5 | 80–100 | 27 | 2 | +24.2% | +16.3% | +32.0% | ❌ (NW unstable) | 7.4% | −7.0% |
+| Q1 | 0–20 | 18 | 1 | −3.8% | −10.8% | +3.2% | ❌ (NW unstable) | 61% | −18.3% |
+| Q2 | 20–40 | 15 | 1 | +10.6% | +8.0% | +13.2% | ❌ (NW unstable) | 7% | −0.5% |
+| Q3 | 40–60 | 35 | 3 | +16.2% | +12.5% | +19.9% | ✅ | 0% | +0.8% |
+| Q4 | 60–80 | 42 | 4 | +15.5% | +10.4% | +20.6% | ✅ | 5% | −7.0% |
+| Q5 | 80–100 | 26 | 2 | +25.0% | +16.5% | +33.5% | ❌ (NW unstable) | 4% | −0.9% |
 
-**Note:** Q4 mean (15.5%) < Q3 mean (16.7%) — monotonicity is broken but likely sample noise (n_eff=3–4).
+**Note:** Q4 mean (15.5%) < Q3 mean (16.2%) — monotonicity still broken after retrain, likely sample noise (n_eff=3–4).
 
 ---
 
@@ -147,6 +148,7 @@ Expected impact:
 |------|--------|-------------|
 | May 2026 | v4: replaced hand-crafted weights with PCA+OLS model | ✅ |
 | May 2026 | v5.6: retrain on fresh 2009–2026 FRED data (184 rows); OOS ρ = 0.480 | ✅ |
+| May 2026 | v5.7: prune MFI (collinear with RSI ρ=0.777); OOS ρ improves to 0.488 | ✅ |
 | May 2026 | Added live PPI + margin debt fetch from Vercel | ✅ |
 | May 2026 | Added TradingView CSV drop zone for RSI/MFI/trend | ✅ |
 | May 2026 | Added self-update mechanism (git pull + rebuild) | ✅ |

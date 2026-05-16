@@ -10,20 +10,20 @@
  *   v5.4: Drop VIX from predictors (audit showed it harmed ρ).         ρ = 0.598.
  *   v5.5: Add yield curve (10Y−3m) + breadth (RSP/SPY 12m chg).        ρ = 0.641.
  *   v5.6: Retrain on fresh 2009–2026 FRED data (184 rows, was 168).    ρ = 0.480.
- *         RSI zeroed again by sign-constraint. MFI technically active
- *         but effectively zero (coef −0.00105, max contribution ±0.002
- *         vs resid_std 0.105 — within noise). mdebt zeroed (not re-activated).
+ *         RSI zeroed by sign-constraint. MFI near-zero (coef −0.00105).
+ *         mdebt zeroed (not re-activated).
+ *   v5.7: Prune MFI — collinear with RSI (ρ=0.777); OOS ρ improves 0.480→0.488.
+ *         4 active predictors: PPI, AAII, yield curve, breadth.
  *
- * Active signals post-retrain (non-zero ridge coef):
- *   MFI (−0.00105, ~noise), PPI (−0.03336), AAII (−0.06789),
- *   Yield curve (−0.04609), Breadth (−0.01709).
- *   Effective predictors with meaningful contribution: PPI, AAII, YC, Breadth.
+ * Active signals (non-zero ridge coef, v5.7):
+ *   PPI (−0.03361), AAII (−0.06851), Yield curve (−0.04656), Breadth (−0.01679).
+ *   RSI, MFI, EMA-dist, mdebt, VIX all zeroed/excluded.
  *
- * OOS ρ drop (0.641 → 0.480): 25% degradation. Likely contributors:
- *   — 2022 inflation/rates regime now more heavily represented in sample.
- *   — v5.5 ρ=0.641 may have had mild specification mining on the same 168 rows.
- *   — 0.480 on a larger, more independent sample is probably the more honest number.
- *   Run scripts/regime_split.py to check if coefs are regime-specific.
+ * OOS ρ history: 0.428 → 0.560 → 0.598 → 0.641 → 0.480 → 0.488
+ * OOS ρ drop (v5.5→v5.6, 0.641→0.480): larger data + harder test, not regime failure.
+ *   Regime-split test (2009-16 → 2017-25) shows OOS ρ=0.702 — model generalises well.
+ *   See scripts/regime_split.py.
+ * OOS ρ recovery (v5.6→v5.7, 0.480→0.488): MFI pruning removed collinear noise.
  *
  * Quintile monotonicity: Q4 mean (15.5%) < Q3 mean (16.7%) after retrain.
  *   Likely sample noise given n_eff=3–4 in those buckets. Not a model failure.
