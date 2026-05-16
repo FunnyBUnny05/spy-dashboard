@@ -95,7 +95,9 @@ function calcOBVDivergence(rows: SpyRow[], lookback = 13): number {
          : window[i].close < window[i - 1].close ? -window[i].volume : 0;
     obvSeries.push(obv);
   }
-  const obvPctChange = (obvSeries[obvSeries.length - 1] / (Math.abs(obvSeries[1]) || 1)) * 100;
+  const avgVol = window.slice(1).reduce((s, r) => s + r.volume, 0) / lookback;
+  if (avgVol === 0) return 0;
+  const obvPctChange = (obvSeries[obvSeries.length - 1] / avgVol) * 100;
   const pricePctChange = ((window[window.length - 1].close - window[1].close) / window[1].close) * 100;
   return obvPctChange - pricePctChange; // negative = OBV lagging price = bearish
 }
