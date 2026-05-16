@@ -20,82 +20,67 @@ I have a SPY composite scoring dashboard. Here is the current model logic.
 Do NOT write TypeScript. Give me logic, math, or Python pseudocode only.
 
 PIPELINE:
-1. Take 7 raw signal values
-2. Z-score each signal using historical mean/std
-3. Project onto 3 PCA components using fixed eigenvectors
-4. Predict 12m forward return using walk-forward OLS
-5. Convert to 0–100 score via percentile rank against historical pred distribution
+1. Take 9 raw signal values (RSI, MFI, EMA-dist, PPI, mdebt, AAII, VIX, yield-curve, breadth)
+2. Rank-Gauss transform every signal against the full-sample sorted reference array
+   rg = normInv(rank / (n+1))  — clamped to (0.01, 0.99)
+3. Predict 12m forward return:
+   pred = intercept + sum(ridge_coef_k * rg_k)   [VIX coef = 0; 4–5 coefs = 0 by sign-constraint]
+4. Composite score = normCDF((pred - drift) / sigma_t) * 100
+   drift  = full-sample mean fwd_12m (0.1503 = ≈15%/yr, 2009–2026 sample)
+   sigma_t = sqrt(max(floor, resid_var_a + resid_var_b * vix_z))  [heteroscedastic]
+   score=50 ⟺ pred equals drift
 
 OUTPUT:
-- compositeScore (0–100): where we sit in the historical distribution
+- compositeScore (0–100)
 - predFwd12m: raw predicted 12m return (e.g. +0.14 = +14%)
-- bucket: which quintile we're in, with empirical forward return stats
+- bucket: which quintile, with empirical forward return stats
 - stance: exposure recommendation based on score
 ```
 
 ---
 
-## Current Model — v4 (as of May 2026)
+## Current Model — v5.6 (as of May 2026, commit 45b5f44)
 
-### 7 Input Signals
+### 9 Input Signals — Ridge Coefficients
 
-| Key | Label | Category | ρ with 12m fwd return | Historical Mean | Std |
-|-----|-------|----------|-----------------------|-----------------|-----|
-| rsi_14m | RSI (14m) | Momentum | −0.523 | 65.48 | 8.62 |
-| mfi_14m | MFI (14m) | Volume momentum | −0.341 | 65.69 | 13.45 |
-| ema_dist_pct | EMA-12m dist % | Trend | −0.213 | 5.31 | 5.16 |
-| ppi_yoy | PPI YoY % | Inflation | −0.318 | 2.67 | 2.82 |
-| mdebt_yoy | Margin debt YoY % | Leverage | −0.226 | 12.01 | 19.29 |
-| aaii_spread | AAII stocks−cash | Retail sentiment | −0.607 | 0.489 | 0.052 |
-| vix_close | VIX | Volatility/fear | +0.267 | 17.88 | 6.66 |
+| Key | Label | Coef | Active? |
+|-----|-------|------|---------|
+| rsi_14m | RSI (14m) | 0.0 | ❌ zeroed by sign-constraint |
+| mfi_14m | MFI (14m) | −0.00105 | ⚠️ active but ~noise (contrib ≤ ±0.002) |
+| ema_dist_pct | EMA-12m dist % | 0.0 | ❌ zeroed |
+| ppi_yoy | PPI YoY % | −0.03336 | ✅ |
+| mdebt_yoy | Margin debt YoY % | 0.0 | ❌ zeroed (not re-activated) |
+| aaii_spread | AAII stocks−cash | −0.06789 | ✅ strongest signal |
+| vix_close | VIX | 0.0 | ❌ excluded a priori (kept for σ_t and UI) |
+| yield_curve_10y3m | Yield curve 10Y−3m | −0.04609 | ✅ |
+| breadth_12m_chg | Breadth (RSP/SPY 12m) | −0.01709 | ✅ |
 
-**Note:** All ρ values are negative except VIX — high RSI/MFI/etc. = bearish. High VIX = bullish.
+Ridge intercept: 0.143527 | Alpha (fixed): 5.0 | OOS Spearman ρ: 0.480
 
-### Step 1: Z-score each signal
-```
-z_i = (value_i - mean_i) / std_i
-```
+**Note on ρ drop (v5.5: 0.641 → v5.6: 0.480):** Likely reflects 2022 inflation/rates regime
+now more prominent in data + possible mild spec mining on the old 168-row sample.
+Run `scripts/regime_split.py` to check if coefs are regime-specific.
 
-### Step 2: PCA — 3 components (85% of variance)
+### Key Model Parameters
 
-**Eigenvectors** (rows = PC1, PC2, PC3 | cols = rsi, mfi, ema_dist, ppi, mdebt, aaii, vix):
-```
-PC1 = [ 0.472,  0.444,  0.441,  0.024,  0.436,  0.404, -0.242]   ← 55% variance, Momentum/Risk cluster
-PC2 = [-0.087,  0.309, -0.166,  0.694,  0.057,  0.199,  0.545]   ← 19% variance, Inflation vs Fear
-PC3 = [-0.038,  0.187,  0.106, -0.461,  0.430, -0.309,  0.676]   ← 11% variance, Cross-currents
+| Parameter | Value | Meaning |
+|-----------|-------|---------|
+| `drift` | 0.1503 | Sample mean fwd_12m (2009–2026). score=50 anchors to ≈15%/yr predicted return |
+| `resid_std` | 0.1046 | Full-sample residual std |
+| `resid_var_a` | 0.01077 | Unconditional residual variance |
+| `resid_var_b` | 0.00361 | Slope of squared residuals on vix_z (conditional component ≈33% of base) |
 
-PC_k = dot(eigvec_k, z_scores)
-```
+### Quintile Buckets — Empirical 12m Forward Returns (post-retrain)
 
-### Step 3: Walk-forward OLS prediction
-```
-pred_fwd_12m = 0.1191 + (-0.0318 × PC1) + (-0.0294 × PC2) + (-0.0674 × PC3)
-```
-OOS Spearman ρ = 0.435 | Residual std = 11.5% | n = 155 training obs
+| Quintile | Score | n | n_eff | Mean 12m | CI lo | CI hi | CI reliable? | % Neg | Worst |
+|----------|-------|---|-------|----------|-------|-------|-------------|-------|-------|
+| Q1 | 0–20 | 17 | 1 | −4.3% | −11.0% | +2.4% | ❌ (NW unstable) | 64.7% | −18.3% |
+| Q2 | 20–40 | 16 | 1 | +10.3% | +7.4% | +13.1% | ❌ (NW unstable) | 6.2% | −0.5% |
+| Q3 | 40–60 | 34 | 3 | +16.7% | +13.3% | +20.0% | ✅ | 0.0% | +2.8% |
+| Q4 | 60–80 | 42 | 4 | +15.5% | +10.2% | +20.8% | ✅ | 2.4% | −6.2% |
+| Q5 | 80–100 | 27 | 2 | +24.2% | +16.3% | +32.0% | ❌ (NW unstable) | 7.4% | −7.0% |
 
-### Step 4: Prediction intervals
-```
-PI_80 = pred ± 1.282 × 0.1155
-PI_95 = pred ± 1.960 × 0.1155
-```
-
-### Step 5: Composite score (0–100)
-```
-score = percentile_rank(pred_fwd_12m, historical_pred_distribution)
-```
-Historical distribution = 145 sorted walk-forward predictions from 2014–2026.
-
----
-
-## Quintile Buckets — Empirical 12m Forward Returns
-
-| Quintile | Score Range | n | Mean 12m | CI lo | CI hi | % Negative | Worst |
-|----------|-------------|---|----------|-------|-------|------------|-------|
-| 1 | 0–20 | 29 | +5.7% | +1.1% | +10.3% | 34.5% | −19.5% |
-| 2 | 20–40 | 26 | +8.5% | +4.7% | +12.2% | 19.2% | −17.8% |
-| 3 | 40–60 | 23 | +10.1% | +6.3% | +13.9% | 13.0% | −10.3% |
-| 4 | 60–80 | 30 | +14.2% | +10.2% | +18.3% | 13.3% | −12.1% |
-| 5 | 80–100 | 25 | +23.1% | +16.4% | +29.8% | 8.0% | −2.1% |
+**Note:** Q4 mean (15.5%) < Q3 mean (16.7%) — monotonicity is broken but likely sample noise (n_eff=3–4).
 
 ---
 
@@ -123,7 +108,10 @@ Historical distribution = 145 sorted walk-forward predictions from 2014–2026.
 | AAII spread | 0.526 | aaii.json |
 | VIX | 16.99 | Manual (CBOE) |
 
-**Current score: ~45 / 100 (Quintile 3 — Neutral)**
+**Current score: 26.34 / 100 (Quintile 2 — Defensive)**
+Note: score=50 anchors to the 2009–2026 sample mean predicted return (≈15%/yr),
+not the long-run 10% nominal SPY return. A score of 50 does not mean "neutral"
+relative to long-run base rates.
 
 ---
 
@@ -158,6 +146,7 @@ Expected impact:
 | Date | Change | Implemented |
 |------|--------|-------------|
 | May 2026 | v4: replaced hand-crafted weights with PCA+OLS model | ✅ |
+| May 2026 | v5.6: retrain on fresh 2009–2026 FRED data (184 rows); OOS ρ = 0.480 | ✅ |
 | May 2026 | Added live PPI + margin debt fetch from Vercel | ✅ |
 | May 2026 | Added TradingView CSV drop zone for RSI/MFI/trend | ✅ |
 | May 2026 | Added self-update mechanism (git pull + rebuild) | ✅ |
