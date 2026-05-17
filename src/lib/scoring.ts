@@ -73,6 +73,9 @@ export interface V5Result {
   ppiRegime: string;
   bucket: BucketDef;
   stance: Stance;
+  stanceZone: StanceZone;   // new
+  scoreLo: number;           // new — 1σ low
+  scoreHi: number;           // new — 1σ high
 }
 
 // ── Model constants ────────────────────────────────────────────────────────────
@@ -296,11 +299,16 @@ export function computeV2(raw: RawSignalValues): V5Result {
   const ppiRegime = raw.ppiYoy > 3.5 ? 'accelerating' : raw.ppiYoy < 1.5 ? 'decelerating' : 'stable';
   const regime    = `${vixRegime} · ppi_${ppiRegime}`;
 
+  const uncertainty = scoreUncertainty(predFwd12m, sigmaT, DRIFT);
+
   return {
     signals, predFwd12m, pi80Lo, pi80Hi, pi95Lo, pi95Hi,
     compositeScore, regime, vixRegime, ppiRegime,
     bucket: bucketFor(compositeScore),
     stance: stanceFor(compositeScore),
+    stanceZone: stanceZoneFor(compositeScore),
+    scoreLo: uncertainty.lo,
+    scoreHi: uncertainty.hi,
   };
 }
 
@@ -385,12 +393,39 @@ export function stanceFor(score: number): Stance {
   return                   { label: 'Wait / buy panic',exposure: '10–30%',   action: 'Hedged or buy >15% drawdown', tone: 'bear'    };
 }
 
+// ── 3-zone stance (TWO(30,80) walk-forward stable) ───────────────────────────
+
+export type ZoneLabel = 'DEFENSIVE' | 'NORMAL' | 'OPPORTUNITY';
+
+export interface StanceZone {
+  label: ZoneLabel;
+  tone: 'bear' | 'neutral' | 'bull';
+  action: string;
+  color: 'red' | 'amber' | 'green';
+}
+
+export function stanceZoneFor(score: number): StanceZone {
+  if (score < 30) return { label: 'DEFENSIVE',   tone: 'bear',    action: 'Reduce exposure · tighten stops · no new buys', color: 'red'   };
+  if (score < 80) return { label: 'NORMAL',       tone: 'neutral', action: 'Hold target exposure',                         color: 'amber' };
+  return                  { label: 'OPPORTUNITY', tone: 'bull',    action: 'Add on weakness',                              color: 'green' };
+}
+
+// ── Score uncertainty band (±1σ_t shift on pred) ────────────────────────────
+
+export function scoreUncertainty(pred: number, sigmaT: number, drift: number): { lo: number; hi: number } {
+  return {
+    lo: Math.round(normCdf((pred - drift - sigmaT) / sigmaT) * 100),
+    hi: Math.round(normCdf((pred - drift + sigmaT) / sigmaT) * 100),
+  };
+}
+
 // ── Historical timeseries ─────────────────────────────────────────────────────
 
 export interface TsRow {
   date: string;
   spy: number;
   score: number | null;
+  score_wf: number | null;   // walk-forward score (populated by scripts/walk_forward_score.py)
   pred: number | null;
   regime: string;
   /** true ⇒ score is from the final full-sample model (look-ahead); false ⇒ walk-forward OOS. */
@@ -400,7 +435,9 @@ export interface TsRow {
 export function getTimeseries(): TsRow[] {
   return ((modelData as any).timeseries as any[]).map((r: any) => ({
     date: r.d, spy: r.spy,
-    score: r.score ?? null, pred: r.pred ?? null,
+    score: r.score ?? null,
+    score_wf: r.score_wf ?? null,
+    pred: r.pred ?? null,
     regime: r.regime ?? '',
     inSample: r.in_sample === true,
   }));
