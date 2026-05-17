@@ -3,6 +3,7 @@ import { Line } from 'react-chartjs-2';
 import { TsRow } from '../lib/scoring';
 import { buildCurve, cagr, maxDD, sharpe } from '../lib/backtest';
 import { tickStyle, gridStyle } from '../lib/chartSetup';
+import { YearByYearChart } from './YearByYearChart';
 
 interface Props {
   timeseries: TsRow[];
@@ -167,6 +168,9 @@ export function TrackRecordPanel({ timeseries }: Props) {
           On a return basis STANCE matches buy-and-hold. The model's value is in risk: ~35% smaller worst-case drawdown, marginally better Sharpe (statistical significance: 92%, not 95%).
         </div>
       </div>
+
+      {/* Year-by-year attribution */}
+      <YearByYearChart />
 
       {/* Lookahead caveat */}
       <div style={{
