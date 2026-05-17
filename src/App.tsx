@@ -26,10 +26,14 @@ import { BuffettPanel }  from './components/BuffettPanel';
 import { AAIIPanel }     from './components/AAIIPanel';
 import { PlaybookPanel }  from './components/PlaybookPanel';
 import { MathPanel }      from './components/MathPanel';
-import { UpdateBanner }   from './components/UpdateBanner';
-import { StrategyPanel }  from './components/StrategyPanel';
+import { UpdateBanner }     from './components/UpdateBanner';
+import { StrategyPanel }    from './components/StrategyPanel';
+import { AlertBanner }      from './components/AlertBanner';
+import { ThresholdsCard }   from './components/ThresholdsCard';
+import { TrackRecordPanel } from './components/TrackRecordPanel';
+import { stanceZoneFor }    from './lib/scoring';
 
-type TabId = 'buckets' | 'history' | 'strategy' | 'buffett' | 'aaii' | 'playbook' | 'math' | 'data';
+type TabId = 'buckets' | 'history' | 'strategy' | 'trackrecord' | 'buffett' | 'aaii' | 'playbook' | 'math' | 'data';
 
 export default function App() {
   const [tab, setTab] = useState<TabId>('buckets');
@@ -140,6 +144,7 @@ export default function App() {
       date:  currentMonth,
       spy:   chartPrice,
       score: result.compositeScore,
+      score_wf: null,
       pred:  result.predFwd12m,
       regime: result.regime,
       inSample: true,   // live point uses the full-sample model
@@ -167,9 +172,13 @@ export default function App() {
   const scoreBadgeCls = s < 20 ? 'badge-bear' : s < 40 ? 'badge-warn' : s < 60 ? 'badge-warn' : 'badge-new';
   const scorePillCls  = s < 40 ? 'badge-bear' : s < 60 ? 'badge-warn' : 'badge-new';
   const scoreLabel    = s < 20 ? 'EXTREME CAUTION' : s < 40 ? 'CAUTIOUS' : s < 60 ? 'NEUTRAL' : s < 80 ? 'BULLISH' : 'STRONG BULL';
+  const stanceZone    = stanceZoneFor(result.compositeScore);
+  const zoneDotColor  = stanceZone.color === 'red' ? '#ef4444' : stanceZone.color === 'amber' ? '#f59e0b' : '#4ade80';
+  const zoneRange     = stanceZone.label === 'DEFENSIVE' ? '0–30' : stanceZone.label === 'NORMAL' ? '30–80' : '80–100';
 
   return (
     <>
+      <AlertBanner score={result.compositeScore} timeseries={timeseries} />
       <UpdateBanner />
       <div className="header">
         <div className="header-left">
@@ -191,9 +200,15 @@ export default function App() {
           </p>
         </div>
         <div className="header-badges">
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ width: 10, height: 10, borderRadius: '50%', background: zoneDotColor, display: 'inline-block', flexShrink: 0 }} />
+            <span style={{ fontSize: 11, color: zoneDotColor, fontWeight: 700 }}>{stanceZone.label}</span>
+            <span style={{ fontSize: 10, color: 'var(--text2)' }}>[{zoneRange}]</span>
+          </span>
           <span className={`badge ${scoreBadgeCls}`}>{scoreLabel}</span>
           <span className={`badge ${scorePillCls}`}>
-            SCORE {result.compositeScore.toFixed(1)} / 100
+            SCORE {result.compositeScore.toFixed(1)}{' '}
+            <span style={{ opacity: 0.6, fontSize: '0.85em' }}>[{result.scoreLo}–{result.scoreHi}]</span>
           </span>
           <span className="badge badge-warn">
             Ridge {result.predFwd12m >= 0 ? '+' : ''}{(result.predFwd12m*100).toFixed(1)}% 12m
@@ -211,11 +226,17 @@ export default function App() {
             score={result.compositeScore}
             asOf={asOf}
             signalCount={9}
+            scoreLo={result.scoreLo}
+            scoreHi={result.scoreHi}
+            timeseries={timeseries}
           />
           <ForwardReturns bucket={result.bucket} score={result.compositeScore} />
           <AAIICard aaii={aaii} />
           <ExposureCard stance={result.stance} prevExposure="20-40% (v5.1)" composite={result.compositeScore} />
         </div>
+
+        {/* THRESHOLDS REFERENCE CARD */}
+        <ThresholdsCard />
 
         {/* 7-SIGNAL GRID */}
         <div className="section-hdr">
@@ -256,6 +277,7 @@ export default function App() {
           <button className={`tab-btn ${tab==='history'  ?'active':''}`} onClick={()=>setTab('history')}>Score History</button>
           <button className={`tab-btn ${tab==='strategy' ?'active':''}`} onClick={()=>setTab('strategy')}
             style={{ color: tab==='strategy' ? 'var(--text)' : 'var(--bull,#4ade80)' }}>Strategy A/B</button>
+          <button className={`tab-btn ${tab==='trackrecord' ?'active':''}`} onClick={()=>setTab('trackrecord')}>Track Record</button>
           <button className={`tab-btn ${tab==='aaii'     ?'active':''}`} onClick={()=>setTab('aaii')}
             style={{ color: tab==='aaii' ? 'var(--text)' : 'var(--aaii)' }}>★ AAII</button>
           <button className={`tab-btn ${tab==='buffett'  ?'active':''}`} onClick={()=>setTab('buffett')}>Buffett</button>
@@ -269,7 +291,8 @@ export default function App() {
 
         {tab==='buckets'  && <BucketsPanel currentBucket={result.bucket} predFwd12m={result.predFwd12m} pi80Lo={result.pi80Lo} pi80Hi={result.pi80Hi} pi95Lo={result.pi95Lo} pi95Hi={result.pi95Hi} />}
         {tab==='history'  && <HistoryPanel timeseries={timeseries} />}
-        {tab==='strategy' && <StrategyPanel timeseries={timeseries} compositeScore={result.compositeScore} />}
+        {tab==='strategy'     && <StrategyPanel timeseries={timeseries} compositeScore={result.compositeScore} />}
+        {tab==='trackrecord'  && <TrackRecordPanel timeseries={timeseries} />}
         {tab==='aaii'     && <AAIIPanel aaii={aaii} history={aaiiHistory} />}
         {tab==='buffett'  && <BuffettPanel />}
         {tab==='playbook' && <PlaybookPanel stance={result.stance} />}
