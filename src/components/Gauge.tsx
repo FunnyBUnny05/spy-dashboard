@@ -1,17 +1,26 @@
 import { regimeLabel, toneColor, toneForScore } from '../lib/format';
+import { TsRow } from '../lib/scoring';
+import { ScoreSparkline } from './ScoreSparkline';
+
+const DRIFT_TOOLTIP = 'Score 50 = predicted return matches the 2009–2026 sample mean (~15%/yr). This is above the long-run SPY average (~10%). A score of ~40 corresponds to a neutral expectation vs. long-run base rates.';
 
 interface Props {
   score: number;
   asOf: string;
   delta?: { value: number; vsLabel: string };
   signalCount: number;
+  scoreLo?: number;
+  scoreHi?: number;
+  timeseries?: TsRow[];
 }
 
-export function Gauge({ score, asOf, delta, signalCount }: Props) {
+export function Gauge({ score, asOf, delta, signalCount, scoreLo, scoreHi, timeseries }: Props) {
   const tone = toneForScore(score);
   const color = toneColor(tone);
   // Map 0-100 to -90 to +90 degrees on a half-circle
   const angle = -90 + (score / 100) * 180;
+
+  const showBand = scoreLo !== undefined && scoreHi !== undefined;
 
   return (
     <div className="gauge-card">
@@ -41,8 +50,21 @@ export function Gauge({ score, asOf, delta, signalCount }: Props) {
           <circle cx="0" cy="-74" r="3" fill={color} />
         </g>
       </svg>
-      <div className="gauge-num" style={{ color }}>{score.toFixed(1)}</div>
+      <div className="gauge-num" style={{ color }}>
+        {score.toFixed(1)}
+        {showBand && (
+          <span style={{ fontSize: '0.45em', color: 'var(--text2)', marginLeft: 6, verticalAlign: 'middle' }}>
+            [{scoreLo}–{scoreHi}]
+          </span>
+        )}
+        {' '}
+        <span
+          title={DRIFT_TOOLTIP}
+          style={{ fontSize: '0.4em', color: 'var(--text2)', cursor: 'help', verticalAlign: 'middle' }}
+        >ⓘ</span>
+      </div>
       <div className="gauge-label" style={{ color }}>{regimeLabel(score)}</div>
+      {timeseries && timeseries.length > 1 && <ScoreSparkline timeseries={timeseries} />}
       <div className="gauge-sub">{asOf} · {signalCount} signals</div>
       {delta && (
         <div
