@@ -12,7 +12,9 @@
     "build:app": "npm run write-source-path && npm run build && electron-builder",
     "preview": "vite preview",
     "update-aaii": "python3 scripts/update_aaii.py",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "chart.js": "^4.4.1",
@@ -30,7 +32,8 @@
     "electron": "^30.0.0",
     "electron-builder": "^24.0.0",
     "typescript": "^5.5.3",
-    "vite": "^5.3.4"
+    "vite": "^5.3.4",
+    "vitest": "^4.1.6"
   },
   "build": {
     "appId": "com.user.spy-dashboard",
