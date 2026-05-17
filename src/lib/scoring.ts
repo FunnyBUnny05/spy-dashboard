@@ -413,6 +413,7 @@ export function stanceZoneFor(score: number): StanceZone {
 // ── Score uncertainty band (±1σ_t shift on pred) ────────────────────────────
 
 export function scoreUncertainty(pred: number, sigmaT: number, drift: number): { lo: number; hi: number } {
+  if (sigmaT === 0) return { lo: 50, hi: 50 };
   return {
     lo: Math.round(normCdf((pred - drift - sigmaT) / sigmaT) * 100),
     hi: Math.round(normCdf((pred - drift + sigmaT) / sigmaT) * 100),

@@ -44,4 +44,10 @@ describe('scoreUncertainty', () => {
     const { lo, hi } = scoreUncertainty(0.20, 0.12, 0.15);
     expect(hi).toBeGreaterThan(lo);
   });
+
+  it('returns {lo:50, hi:50} when sigmaT is 0', () => {
+    const { lo, hi } = scoreUncertainty(0.15, 0, 0.15);
+    expect(lo).toBe(50);
+    expect(hi).toBe(50);
+  });
 });
