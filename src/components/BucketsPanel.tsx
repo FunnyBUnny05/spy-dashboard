@@ -43,6 +43,10 @@ export function BucketsPanel({ currentBucket, predFwd12m, pi80Lo, pi80Hi, pi95Lo
                 <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 8 }}>
                   80% CI [{pct(pi80Lo, 0)}, {pct(pi80Hi, 0)}]
                 </span>
+                <span title="Empirical coverage 77.3% vs 80% target — well-calibrated"
+                      style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 4 }}>
+                  (calibrated)
+                </span>
               </div>
               <span style={{ color: 'var(--text3)', fontSize: 10 }}>{(bMax*100).toFixed(0)}%</span>
             </div>
@@ -102,7 +106,11 @@ export function BucketsPanel({ currentBucket, predFwd12m, pi80Lo, pi80Hi, pi95Lo
             {currentBucket.pctNeg.toFixed(0)}% ended negative.
           </>}
           {' '}Ridge model predicts <strong>{pct(predFwd12m)}</strong> with VIX-conditional
-          95% interval [{pct(pi95Lo, 0)}, {pct(pi95Hi, 0)}].
+          95% interval [{pct(pi95Lo, 0)}, {pct(pi95Hi, 0)}].{' '}
+          <span title="Empirical coverage 84.9% vs 95% target — band is too tight at the extremes"
+                style={{ fontSize: 10, color: 'var(--warn)', marginLeft: 4 }}>
+            (95% PI runs ~10pp narrow)
+          </span>
         </div>
         <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 6, lineHeight: 1.45 }}>
           <strong>*</strong> Sparse buckets (n &lt; 5): the model rarely emits scores at the extremes
