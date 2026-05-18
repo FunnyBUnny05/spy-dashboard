@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { stanceZoneFor, scoreUncertainty } from '../scoring';
+import { stanceZoneFor, scoreUncertainty, computeV2, bucketFor, BUCKETS, scoreAAII, getAAIIData } from '../scoring';
+import { CURRENT } from '../snapshot';
 
 describe('stanceZoneFor', () => {
   it('returns DEFENSIVE for score < 30', () => {
@@ -23,6 +24,45 @@ describe('stanceZoneFor', () => {
     expect(stanceZoneFor(100).label).toBe('OPPORTUNITY');
     expect(stanceZoneFor(80).color).toBe('green');
     expect(stanceZoneFor(80).tone).toBe('bull');
+  });
+});
+
+describe('computeV2 smoke test', () => {
+  it('returns compositeScore in [0,100], finite predFwd12m, and stance with exposure string', () => {
+    const result = computeV2(CURRENT);
+    expect(result.compositeScore).toBeGreaterThanOrEqual(0);
+    expect(result.compositeScore).toBeLessThanOrEqual(100);
+    expect(Number.isFinite(result.predFwd12m)).toBe(true);
+    expect(typeof result.stance.exposure).toBe('string');
+    expect(result.stance.exposure.length).toBeGreaterThan(0);
+  });
+});
+
+describe('bucketFor edge cases', () => {
+  it('returns a non-null bucket with a truthy label for boundary scores', () => {
+    for (const score of [0, 20, 40, 60, 80, 100]) {
+      const bucket = bucketFor(score);
+      expect(bucket).not.toBeNull();
+      expect(bucket.label).toBeTruthy();
+    }
+  });
+
+  it('score=0 returns the lowest bucket and score=100 returns the highest', () => {
+    const lowest  = BUCKETS[0];
+    const highest = BUCKETS[BUCKETS.length - 1];
+    expect(bucketFor(0).label).toBe(lowest.label);
+    expect(bucketFor(100).label).toBe(highest.label);
+  });
+});
+
+describe('scoreAAII integration', () => {
+  it('returns score in [0,100] and a valid flag string', () => {
+    const { history, stats } = getAAIIData();
+    const result = scoreAAII(history, stats);
+    expect(result.score).toBeGreaterThanOrEqual(0);
+    expect(result.score).toBeLessThanOrEqual(100);
+    const validFlags = ['extreme-greed', 'greed', 'neutral', 'fear', 'extreme-fear'];
+    expect(validFlags).toContain(result.flag);
   });
 });
 
