@@ -18,11 +18,13 @@ function buildCurveWF(timeseries: TsRow[]): { labels: string[]; bh: number[]; st
   let bhV = 100, stanceV = 100;
   let lastScore: number | null = null;
 
-  const firstScored = rows.findIndex(r => r.score_wf !== null && r.score_wf !== undefined);
+  // Use OOS rows only (inSample=false). Until walk_forward_score.py embeds true WF
+  // scores, all rows have inSample=true and this returns empty (hasWF stays false).
+  const firstScored = rows.findIndex(r => !r.inSample && r.score !== null);
   if (firstScored < 0) return { labels, bh, stance };
 
   for (let i = firstScored; i < rows.length - 1; i++) {
-    if (rows[i].score_wf !== null && rows[i].score_wf !== undefined) lastScore = rows[i].score_wf as number;
+    if (!rows[i].inSample && rows[i].score !== null) lastScore = rows[i].score as number;
     if (lastScore === null) continue;
     const exposure = lastScore >= 60 ? 1.0 : 0.0;
     const ret = rows[i + 1].spy / rows[i].spy - 1;

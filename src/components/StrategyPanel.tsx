@@ -14,14 +14,15 @@ function binaryExposure(score: number): number {
 }
 
 export function StrategyPanel({ timeseries, compositeScore }: Props) {
-  const { labels, bh, ft, b60 } = useMemo(() => buildCurve(timeseries), [timeseries]);
+  const { labels, bh, ft, b60, sma } = useMemo(() => buildCurve(timeseries), [timeseries]);
   const n = labels.length;
 
   const metrics = useMemo(() => ({
     bh:  { cagr: cagr(bh, n),  mdd: maxDD(bh),  sharpe: sharpe(bh)  },
     ft:  { cagr: cagr(ft, n),  mdd: maxDD(ft),  sharpe: sharpe(ft)  },
     b60: { cagr: cagr(b60, n), mdd: maxDD(b60), sharpe: sharpe(b60) },
-  }), [bh, ft, b60, n]);
+    sma: { cagr: cagr(sma, n), mdd: maxDD(sma), sharpe: sharpe(sma) },
+  }), [bh, ft, b60, sma, n]);
 
   const ftStance = fiveTierExposure(compositeScore);
   const b60Stance = binaryExposure(compositeScore);
@@ -71,6 +72,16 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
         fill: false,
         tension: 0.2,
       },
+      {
+        label: '10m SMA',
+        data: sma,
+        borderColor: '#d62728',
+        borderWidth: 1.2,
+        pointRadius: 0,
+        fill: false,
+        tension: 0.2,
+        borderDash: [3, 3],
+      },
     ],
   };
 
@@ -110,6 +121,7 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
               { color: '#565a61', label: 'Buy & Hold', dash: true },
               { color: '#3d7fd4', label: '5-Tier' },
               { color: '#1fa876', label: 'Binary ≥60' },
+              { color: '#d62728', label: '10m SMA', dash: true },
             ].map(({ color, label, dash }) => (
               <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                 <span style={{
@@ -149,6 +161,7 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
           No transaction costs. Cash earns 0%. Score from month t sets exposure for t→t+1.
           All consecutive months used; score carried forward over unscored gaps.
           Includes in-sample periods (look-ahead) — verified OOS-only numbers in table below.
+          10-month SMA is shown as a simple price-trend benchmark.
         </div>
       </div>
 
@@ -173,6 +186,7 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
               { label: 'Buy & Hold',   m: metrics.bh,  curve: bh,  color: '#565a61' },
               { label: '5-Tier',       m: metrics.ft,  curve: ft,  color: '#3d7fd4' },
               { label: 'Binary ≥60',   m: metrics.b60, curve: b60, color: '#1fa876' },
+              { label: '10m SMA',      m: metrics.sma, curve: sma, color: '#d62728' },
             ].map(({ label, m, curve, color }) => (
               <tr key={label}>
                 <td style={{ color }}><strong>{label}</strong></td>

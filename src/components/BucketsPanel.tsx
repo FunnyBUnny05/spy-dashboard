@@ -78,8 +78,8 @@ export function BucketsPanel({ currentBucket, predFwd12m, pi80Lo, pi80Hi, pi95Lo
                     </td>
                     <td style={{ color: sparse ? 'var(--warn)' : 'var(--text3)' }}>{b.n}</td>
                     <td className={empty ? '' : cls} style={{ fontWeight: 600 }}>{empty ? '—' : pct(b.mean)}</td>
-                    <td style={{ color: 'var(--text3)', fontSize: 10 }}>
-                      {empty ? '—' : `[${pct(b.ciLo, 0)}, ${pct(b.ciHi, 0)}]`}
+                    <td style={{ color: 'var(--text3)', fontSize: 10, opacity: (!empty && !b.ciReliable) ? 0.5 : 1 }}>
+                      {empty ? '—' : `[${pct(b.ciLo, 0)}, ${pct(b.ciHi, 0)}]${!b.ciReliable ? '*' : ''}`}
                     </td>
                     <td className={empty ? '' : (b.pctNeg > 30 ? 'bear' : b.pctNeg > 15 ? 'warn' : 'bull')}>
                       {empty ? '—' : `${b.pctNeg.toFixed(0)}%`}
@@ -108,6 +108,7 @@ export function BucketsPanel({ currentBucket, predFwd12m, pi80Lo, pi80Hi, pi95Lo
           <strong>*</strong> Sparse buckets (n &lt; 5): the model rarely emits scores at the extremes
           under the v5.7 sign-constrained ridge (α=5), so Q1 and Q5 may be thinly populated.
           This is a property of the prediction distribution, not a fixable defect.
+          CI marked * and dimmed when n_eff &lt; 3 effective independent observations (Newey-West SE unstable).
         </div>
       </div>
 
@@ -127,7 +128,7 @@ export function BucketsPanel({ currentBucket, predFwd12m, pi80Lo, pi80Hi, pi95Lo
                 <div className="bucket-row-label">{b.label}</div>
                 <div className="bucket-row-bar-wrap">
                   <div className="bucket-row-ci"
-                    style={{ left: `${bs(b.ciLo)}%`, right: `${100-bs(b.ciHi)}%` }} />
+                    style={{ left: `${bs(b.ciLo)}%`, right: `${100-bs(b.ciHi)}%`, opacity: b.ciReliable ? 1 : 0.35 }} />
                   <div className="bucket-row-zero" style={{ left: `${bs(0)}%` }} />
                   <div className="bucket-row-mean"
                     style={{ left: `${barL}%`, width: `${barW}%`,

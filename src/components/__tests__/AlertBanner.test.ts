@@ -3,7 +3,7 @@ import { detectBannerState } from '../AlertBanner';
 import { TsRow } from '../../lib/scoring';
 
 function makeRow(score: number | null, date = '2024-01'): TsRow {
-  return { date, spy: 400, score, score_wf: null, pred: null, regime: 'normal', inSample: true };
+  return { date, spy: 400, score, pred: null, regime: 'normal', inSample: true };
 }
 
 describe('detectBannerState', () => {

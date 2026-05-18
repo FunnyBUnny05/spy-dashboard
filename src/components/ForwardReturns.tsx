@@ -42,8 +42,15 @@ export function ForwardReturns({ bucket, score }: Props) {
       <div className="stat-label">Fwd returns — this bucket (n={bucket.n})</div>
       <div style={{ marginTop: 12 }}>
         <FwdRow label="12m mean" value={bucket.mean} />
-        <FwdRow label="CI lo"    value={bucket.ciLo} />
-        <FwdRow label="CI hi"    value={bucket.ciHi} />
+        <div style={bucket.ciReliable ? undefined : { opacity: 0.5 }}>
+          <FwdRow label={bucket.ciReliable ? 'CI lo' : 'CI lo*'} value={bucket.ciLo} />
+          <FwdRow label={bucket.ciReliable ? 'CI hi' : 'CI hi*'} value={bucket.ciHi} />
+        </div>
+        {!bucket.ciReliable && (
+          <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>
+            * CI based on n_eff &lt; 3 effective independent observations; treat as indicative only.
+          </div>
+        )}
       </div>
       <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border2)', fontSize: 11, color: 'var(--text3)', lineHeight: 1.8 }}>
         % negative 12m: <span className={bucket.pctNeg > 30 ? 'bear' : bucket.pctNeg > 15 ? 'warn' : 'bull'} style={{ fontWeight: 600 }}>

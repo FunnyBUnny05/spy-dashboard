@@ -3,11 +3,10 @@ import { toneColor } from '../lib/format';
 
 interface Props {
   stance: Stance;
-  prevExposure?: string;
   composite: number;
 }
 
-export function ExposureCard({ stance, prevExposure, composite }: Props) {
+export function ExposureCard({ stance, composite }: Props) {
   // Pull a midpoint from the exposure range for the bar
   const m = stance.exposure.match(/(\d+)[–-](\d+)/);
   const mid = m ? (parseInt(m[1]) + parseInt(m[2])) / 2 : 50;
@@ -29,7 +28,6 @@ export function ExposureCard({ stance, prevExposure, composite }: Props) {
       <div className="stat-sub">
         Stance: <strong style={{ color }}>{stance.label}</strong>
         <br />
-        {prevExposure && <>Prev: {prevExposure}<br /></>}
         Action: {stance.action}
       </div>
       <div style={{ marginTop: 12 }}>

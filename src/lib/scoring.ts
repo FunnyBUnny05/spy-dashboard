@@ -102,9 +102,10 @@ function condResidStd(vixClose: number): number {
   return Math.sqrt(v);
 }
 
-// Rank-Gauss reference distributions. v5.2 stores per-signal sorted refs in
-// `rank_gauss_sorted` and the active set in `rank_gauss_signals`. Older models
-// only had ppi/mdebt — fall back to those for backward compatibility.
+// Rank-Gauss reference distributions. The current model (v5.7) rank-Gauss-
+// transforms ALL 9 signals. Earlier versions transformed only ppi_yoy and
+// mdebt_yoy — the fallback list below preserves that legacy behavior if a
+// pre-v5.2 model.json is loaded.
 const RG_SORTED_MAP = ((modelData as any).rank_gauss_sorted ?? {}) as Record<string, number[]>;
 const RG_SIGNAL_LIST = ((modelData as any).rank_gauss_signals ?? ['ppi_yoy', 'mdebt_yoy']) as string[];
 const RANK_GAUSS_SIGNALS = new Set(RG_SIGNAL_LIST);
@@ -426,7 +427,6 @@ export interface TsRow {
   date: string;
   spy: number;
   score: number | null;
-  score_wf: number | null;   // walk-forward score (populated by scripts/walk_forward_score.py)
   pred: number | null;
   regime: string;
   /** true ⇒ score is from the final full-sample model (look-ahead); false ⇒ walk-forward OOS. */
@@ -437,7 +437,6 @@ export function getTimeseries(): TsRow[] {
   return ((modelData as any).timeseries as any[]).map((r: any) => ({
     date: r.d, spy: r.spy,
     score: r.score ?? null,
-    score_wf: r.score_wf ?? null,
     pred: r.pred ?? null,
     regime: r.regime ?? '',
     inSample: r.in_sample === true,
