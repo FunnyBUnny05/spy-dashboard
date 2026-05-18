@@ -46,8 +46,10 @@ export function detectBannerState(score: number, timeseries: TsRow[]): BannerSta
   return null;
 }
 
-function dismissalKey(type: BannerType, score: number): string {
-  return `${type}_${Math.round(score)}`;
+function dismissalKey(type: BannerType): string {
+  const now = new Date();
+  const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  return `${type}_${ym}`;
 }
 
 const colorStyle: Record<'red' | 'amber' | 'green', React.CSSProperties> = {
@@ -63,7 +65,7 @@ export function AlertBanner({ score, timeseries }: AlertBannerProps) {
   });
 
   if (!banner) return null;
-  const key = dismissalKey(banner.type, score);
+  const key = dismissalKey(banner.type);
   if (dismissed === key) return null;
 
   const dismiss = () => {

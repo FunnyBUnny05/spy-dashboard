@@ -145,7 +145,6 @@ export default function App() {
       date:  currentMonth,
       spy:   chartPrice,
       score: result.compositeScore,
-      score_wf: null,
       pred:  result.predFwd12m,
       regime: result.regime,
       inSample: true,   // live point uses the full-sample model
@@ -170,7 +169,9 @@ export default function App() {
     : '● live';
 
   const s = Math.round(result.compositeScore);
-  const scoreBadgeCls = s < 20 ? 'badge-bear' : s < 40 ? 'badge-warn' : s < 60 ? 'badge-warn' : 'badge-new';
+  // 3 visual states for 5 text labels: bear / amber / bull.
+  // CAUTIOUS and NEUTRAL share amber; BULLISH and STRONG BULL share green.
+  const scoreBadgeCls = s < 20 ? 'badge-bear' : s < 60 ? 'badge-warn' : 'badge-new';
   const scorePillCls  = s < 40 ? 'badge-bear' : s < 60 ? 'badge-warn' : 'badge-new';
   const scoreLabel    = s < 20 ? 'EXTREME CAUTION' : s < 40 ? 'CAUTIOUS' : s < 60 ? 'NEUTRAL' : s < 80 ? 'BULLISH' : 'STRONG BULL';
   const stanceZone    = stanceZoneFor(result.compositeScore);
@@ -233,7 +234,7 @@ export default function App() {
           />
           <ForwardReturns bucket={result.bucket} score={result.compositeScore} />
           <AAIICard aaii={aaii} />
-          <ExposureCard stance={result.stance} prevExposure="20-40% (v5.1)" composite={result.compositeScore} />
+          <ExposureCard stance={result.stance} composite={result.compositeScore} />
         </div>
 
         {/* THRESHOLDS REFERENCE CARD */}
