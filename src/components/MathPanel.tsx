@@ -20,7 +20,7 @@ export function MathPanel({ signals, composite }: Props) {
   return (
     <div className="two-col">
       <div className="chart-box">
-        <div className="chart-title"><span>v5.6 — Ridge regression · signal contributions</span></div>
+        <div className="chart-title"><span>v5.7 — Ridge regression · signal contributions</span></div>
         <table>
           <thead>
             <tr>
@@ -65,7 +65,7 @@ export function MathPanel({ signals, composite }: Props) {
       </div>
 
       <div className="chart-box">
-        <div className="chart-title"><span>v5.6 model summary</span></div>
+        <div className="chart-title"><span>v5.7 model summary</span></div>
         <table>
           <thead>
             <tr>
@@ -85,10 +85,10 @@ export function MathPanel({ signals, composite }: Props) {
         </table>
 
         <div className="callout callout-info" style={{ marginTop: 16, fontSize: 11 }}>
-          <strong>v5.6 methodology:</strong> Rank-Gauss normalise all 9 signals
-          → sign-constrained Ridge (α={ALPHA}, fixed) on 8 predictors (VIX excluded as a predictor since OOS audit showed it harms ρ; still used for σ_t).
-          Coefficients forced to share sign with univariate ρ; constraint auto-prunes 4 redundant signals (RSI, EMA dist, MDebt, VIX).
-          Effective model uses 5 active signals: MFI, PPI, AAII, Yield Curve, Breadth
+          <strong>v5.7 methodology:</strong> Rank-Gauss normalise all 9 signals
+          → sign-constrained Ridge (α={ALPHA}, fixed) on 7 predictors (VIX excluded as a predictor since OOS audit showed it harms ρ; MFI pruned in v5.7 due to collinearity with RSI; VIX still used for σ_t).
+          Coefficients forced to share sign with univariate ρ; constraint auto-prunes 3 of the 7 (RSI, EMA dist, MDebt).
+          Effective model uses 4 active signals: PPI, AAII, Yield Curve, Breadth
           → pred_fwd_12m = intercept + Σ coef·z → composite score = Φ((pred − drift) / σ(VIX)) × 100.
           score=50 ⟺ pred equals historical drift ({(DRIFT*100).toFixed(1)}%).
           Residual std is heteroscedastic: σ²(t) = max(floor, {RESID_VAR_A.toFixed(4)} + {RESID_VAR_B >= 0 ? '+' : ''}{RESID_VAR_B.toFixed(4)}·vix_z).

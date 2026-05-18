@@ -1,5 +1,5 @@
 /**
- * Current snapshot — raw signal values for the v5.5 model.
+ * Current snapshot — raw signal values for the v5.7 model.
  *
  * UPDATE MONTHLY:
  *   rsi14m          — from TradingView SPY weekly CSV (auto-computed when you drop CSV)
@@ -18,7 +18,7 @@
 export interface RawSnapshot {
   asOf: string;
   spyPrice: number;
-  // v5.5 model inputs
+  // v5.7 model inputs
   rsi14m:          number;
   mfi14m:          number;
   emaDistPct:      number;

@@ -1,0 +1,125 @@
+<h2>Track Record tab layout</h2>
+<p class="subtitle">Backtest equity curves · Stats table · Year-by-year attribution · Walk-forward toggle · Lookahead caveat</p>
+
+<div class="mockup" style="max-width:900px;margin:0 auto">
+  <div class="mockup-header">Track Record tab</div>
+  <div class="mockup-body" style="padding:12px 16px;background:#111;font-family:monospace;font-size:12px;color:#ccc">
+
+    <!-- Equity curves -->
+    <div style="background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:12px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:700;color:#fff">Equity Curves · Dec 2010 – May 2026</div>
+        <label style="font-size:11px;color:#60a5fa;cursor:pointer">
+          <input type="checkbox" style="margin-right:4px"> Show walk-forward score (Change 9)
+        </label>
+      </div>
+      <!-- Chart placeholder -->
+      <div style="background:#111;border-radius:4px;height:140px;position:relative;overflow:hidden">
+        <svg viewBox="0 0 500 140" style="width:100%;height:100%">
+          <!-- BH curve (gray) -->
+          <polyline points="0,120 50,100 100,90 150,75 180,80 200,60 250,45 300,30 320,50 340,25 400,15 450,10 500,8"
+            fill="none" stroke="#6b7280" stroke-width="2"/>
+          <!-- STANCE_NL curve (blue) -->
+          <polyline points="0,120 50,103 100,94 150,82 180,90 200,68 250,56 300,44 320,60 340,38 400,30 450,26 500,24"
+            fill="none" stroke="#60a5fa" stroke-width="2"/>
+          <!-- Labels -->
+          <text x="505" y="12" fill="#6b7280" font-size="8">BH 5.96×</text>
+          <text x="505" y="28" fill="#60a5fa" font-size="8">STANCE 5.45×</text>
+        </svg>
+      </div>
+      <!-- Stats table -->
+      <table style="width:100%;margin-top:8px;border-collapse:collapse;font-size:11px">
+        <thead>
+          <tr style="color:#888;border-bottom:1px solid #333">
+            <th style="text-align:left;padding:3px 6px"></th>
+            <th style="text-align:right;padding:3px 6px">Buy &amp; Hold</th>
+            <th style="text-align:right;padding:3px 6px">STANCE_NL</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style="padding:3px 6px;color:#888">Final value</td><td style="text-align:right;color:#6b7280">5.96×</td><td style="text-align:right;color:#60a5fa">5.45×</td></tr>
+          <tr><td style="padding:3px 6px;color:#888">CAGR</td><td style="text-align:right;color:#6b7280">12.41%</td><td style="text-align:right;color:#60a5fa">11.76%</td></tr>
+          <tr><td style="padding:3px 6px;color:#888">Sharpe</td><td style="text-align:right;color:#6b7280">0.72</td><td style="text-align:right;color:#60a5fa">0.84</td></tr>
+          <tr><td style="padding:3px 6px;color:#888">Max drawdown</td><td style="text-align:right;color:#ef4444">−24.8%</td><td style="text-align:right;color:#4ade80">−16.4%</td></tr>
+        </tbody>
+      </table>
+      <div style="font-size:10px;color:#555;margin-top:6px;font-style:italic">
+        On a return basis STANCE matches buy-and-hold. The model's value is in risk: ~35% smaller worst-case drawdown, marginally better Sharpe (statistical significance: 92%, not 95%).
+      </div>
+    </div>
+
+    <!-- Year-by-year chart -->
+    <div style="background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:12px;margin-bottom:10px">
+      <div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:6px">Year-by-Year Attribution · BH vs STANCE_NL</div>
+      <div style="font-size:10px;color:#555;margin-bottom:8px">The score helped most in 2011, 2020, 2022, 2025. It hurt most in 2014, 2017, 2021, 2024 — strong bull years where it was over-cautious.</div>
+      <!-- Bar chart mockup for select years -->
+      <div style="display:flex;align-items:flex-end;gap:10px;height:80px;padding-bottom:18px;position:relative">
+        <!-- 0 line -->
+        <div style="position:absolute;bottom:18px;left:0;right:0;height:1px;background:#333"></div>
+        <style>.yr-label{position:absolute;bottom:0;font-size:9px;color:#666;text-align:center;width:100%}</style>
+
+        <!-- 2011 +5.25 -->
+        <div style="position:relative;flex:1;display:flex;flex-direction:column;align-items:center">
+          <div style="width:100%;background:#6b7280;height:1px"></div><!-- BH 0% -->
+          <div style="width:60%;background:#60a5fa;height:21px;margin-top:-21px;opacity:0.85"></div>
+          <div class="yr-label">2011</div>
+        </div>
+        <!-- 2014 -5.46 -->
+        <div style="position:relative;flex:1;display:flex;flex-direction:column;align-items:center">
+          <div style="width:100%;background:#6b7280;height:22px;margin-top:-22px;opacity:0.6"></div>
+          <div style="width:60%;background:#ef4444;height:22px;opacity:0.7"></div>
+          <div class="yr-label">2014</div>
+        </div>
+        <!-- 2017 -9.16 -->
+        <div style="position:relative;flex:1;display:flex;flex-direction:column;align-items:center">
+          <div style="width:100%;background:#6b7280;height:37px;margin-top:-37px;opacity:0.6"></div>
+          <div style="width:60%;background:#ef4444;height:37px;opacity:0.7"></div>
+          <div class="yr-label">2017</div>
+        </div>
+        <!-- 2020 +2.17 -->
+        <div style="position:relative;flex:1;display:flex;flex-direction:column;align-items:center">
+          <div style="width:100%;background:#6b7280;height:52px;margin-top:-52px;opacity:0.6"></div>
+          <div style="width:60%;background:#60a5fa;height:8px;margin-top:-8px;opacity:0.85"></div>
+          <div class="yr-label">2020</div>
+        </div>
+        <!-- 2021 -6.47 -->
+        <div style="position:relative;flex:1;display:flex;flex-direction:column;align-items:center">
+          <div style="width:100%;background:#6b7280;height:24px;margin-top:-24px;opacity:0.6"></div>
+          <div style="width:60%;background:#ef4444;height:26px;opacity:0.7"></div>
+          <div class="yr-label">2021</div>
+        </div>
+        <!-- 2022 +8.11 -->
+        <div style="position:relative;flex:1;display:flex;flex-direction:column;align-items:center">
+          <div style="width:100%;background:#6b7280;height:12px;opacity:0.6;margin-top:12px"></div><!-- BH neg -->
+          <div style="width:60%;background:#60a5fa;height:32px;margin-top:-44px;opacity:0.85"></div>
+          <div class="yr-label">2022</div>
+        </div>
+        <!-- 2024 -5.78 -->
+        <div style="position:relative;flex:1;display:flex;flex-direction:column;align-items:center">
+          <div style="width:100%;background:#6b7280;height:28px;margin-top:-28px;opacity:0.6"></div>
+          <div style="width:60%;background:#ef4444;height:23px;opacity:0.7"></div>
+          <div class="yr-label">2024</div>
+        </div>
+        <!-- 2025 +3.58 -->
+        <div style="position:relative;flex:1;display:flex;flex-direction:column;align-items:center">
+          <div style="width:100%;background:#6b7280;height:28px;margin-top:-28px;opacity:0.6"></div>
+          <div style="width:60%;background:#60a5fa;height:14px;margin-top:-14px;opacity:0.85"></div>
+          <div class="yr-label">2025</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;font-size:10px;color:#888;margin-top:4px">
+        <span><span style="display:inline-block;width:10px;height:10px;background:#6b7280;border-radius:2px;margin-right:4px;vertical-align:middle"></span>Buy &amp; Hold</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:#60a5fa;border-radius:2px;margin-right:4px;vertical-align:middle"></span>STANCE_NL</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:2px;margin-right:4px;vertical-align:middle"></span>STANCE underperformed</span>
+      </div>
+    </div>
+
+    <!-- Lookahead caveat -->
+    <div style="background:#1a1a2e;border:1px solid #1e3a5f;border-radius:6px;padding:10px;font-size:10px;color:#93c5fd">
+      <span style="font-weight:700">ⓘ Methodology note:</span> Historical scores were computed using a model fit on the full 2009–2026 sample. A real-time score computed in 2015 would have been similar but noisier (no future signal distribution to reference). The walk-forward score toggle above shows temporally-honest scores refitted at each step.
+    </div>
+
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px">Take a look — does the Track Record tab layout work for you? Tell me in the terminal.</p>

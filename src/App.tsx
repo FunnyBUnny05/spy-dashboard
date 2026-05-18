@@ -183,9 +183,9 @@ export default function App() {
       <UpdateBanner />
       <div className="header">
         <div className="header-left">
-          <h1>SPY COMPOSITE SCORING SYSTEM v5.6</h1>
+          <h1>SPY COMPOSITE SCORING SYSTEM v5.7</h1>
           <p>
-            Sign-constrained Ridge · 5 active signals (MFI, PPI, AAII, Yield, Breadth) · {asOf}
+            Sign-constrained Ridge · 4 active signals (PPI, AAII, Yield, Breadth) · {asOf}
             {' · '}
             <span className={liveStatus === 'ok' ? 'live-dot-ok' : liveStatus === 'error' ? 'live-dot-err' : 'live-dot-loading'}>
               {liveLabel}
@@ -241,7 +241,7 @@ export default function App() {
 
         {/* 7-SIGNAL GRID */}
         <div className="section-hdr">
-          Seven signals — value · historical percentile · correlation with 12m forward return
+          Nine signals — value · historical percentile · correlation with 12m forward return
           {liveStatus === 'ok' && <span className="live-badge"> PPI · Margin Debt{liveData?.vix ? ' · VIX' : ''} live</span>}
           {spySignals     && <span className="live-badge"> RSI · MFI · Trend from monthly SPY CSV</span>}
           {vixSignals     && <span className="live-badge"> VIX from CSV</span>}
@@ -313,9 +313,9 @@ export default function App() {
       </div>
 
       <footer>
-        SPY Composite v5.6 · Sign-constrained Ridge · {asOf} ·
-        Active: MFI, PPI, AAII, Yield, Breadth (VIX excluded; RSI/EMA-dist/MDebt auto-pruned) ·
-        OOS ρ=0.480 · Not a forecast
+        SPY Composite v5.7 · Sign-constrained Ridge · {asOf} ·
+        Active: PPI, AAII, Yield, Breadth (VIX excluded; RSI/MFI/EMA-dist/MDebt auto-pruned) ·
+        OOS ρ=0.488 · Not a forecast
       </footer>
     </>
   );

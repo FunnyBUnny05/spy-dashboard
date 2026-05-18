@@ -1,10 +1,13 @@
 /**
- * BreadthCsvDrop — drag-and-drop for RSP weekly OHLCV data.
+ * BreadthCsvDrop — drag-and-drop for RSP OHLCV data (daily, weekly, or monthly).
  *
- * TradingView: Search RSP → set to 1W → right-click → Export chart data
+ * TradingView: Search RSP → set to 1M (or 1W) → right-click → Export chart data
  *
- * Computes RSP 12m return. If SPX/SPY return12m is also provided (from the
- * SPX CSV already dropped), computes the RSP/SPY ratio change:
+ * Computes RSP 12-month return by finding the row closest to (latest − 365 days),
+ * so the result is correct regardless of bar frequency.
+ *
+ * If SPX/SPY return12m is also provided (from the SPX CSV already dropped),
+ * computes the RSP/SPY ratio change:
  *   breadth12mChg = ((1 + rsp12m/100) / (1 + spy12m/100) − 1) × 100
  *
  * This matches the snapshot definition: RSP/SPY 12m % change.
@@ -22,10 +25,22 @@ export interface BreadthSignals {
 }
 
 function normalizeDate(raw: string): string {
-  if (/^\d{9,11}$/.test(raw.trim())) {
-    return new Date(parseInt(raw) * 1000).toISOString().slice(0, 10);
+  // See SpyCsvDrop.tsx for full rationale. Accepts signed integers as unix
+  // epoch (seconds or ms) plus ISO/Yahoo date strings; throws on unparseable.
+  const t = raw.trim();
+  if (/^-?\d+$/.test(t)) {
+    const n = parseInt(t, 10);
+    const secs = Math.abs(n) >= 1e12 ? n / 1000 : n;
+    if (secs >= -5364662400 && secs <= 7258118400) {
+      const d = new Date(secs * 1000);
+      if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    }
+    throw new Error(`Date out of plausible range: "${raw}"`);
   }
-  return raw.trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0, 10);
+  const d = new Date(t);
+  if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  throw new Error(`Unparseable date value: "${raw}"`);
 }
 
 function parseRspCSV(text: string): { date: string; close: number }[] {
@@ -44,9 +59,33 @@ function parseRspCSV(text: string): { date: string; close: number }[] {
     if (isNaN(close) || close <= 0) continue;
     rows.push({ date: normalizeDate(cols[dateIdx]), close });
   }
-  if (rows.length < 53) throw new Error(`Need at least 53 weekly bars (got ${rows.length}). Use weekly RSP data.`);
   rows.sort((a, b) => a.date.localeCompare(b.date));
+  // Need at least ~12 months of history regardless of bar frequency.
+  if (rows.length < 2) throw new Error('No valid rows found in CSV');
+  const spanDays = (new Date(rows[rows.length - 1].date).getTime()
+                  - new Date(rows[0].date).getTime()) / 86400000;
+  if (spanDays < 360) {
+    throw new Error(
+      `Need at least 12 months of history (got ${spanDays.toFixed(0)} days across ${rows.length} bars).`
+    );
+  }
   return rows;
+}
+
+/** Find the row whose date is closest to (latestDate − 12 months), regardless
+ *  of whether the CSV is daily, weekly, or monthly. Returns its close price.
+ *  Falls back to rows[0] if the file doesn't reach back a full year (caller
+ *  already validated 360-day span, so this is just a safety net). */
+function priceTwelveMonthsAgo(rows: { date: string; close: number }[]): number {
+  const latest = new Date(rows[rows.length - 1].date).getTime();
+  const target = latest - 365 * 86400000;
+  // Binary search for the row at or just before the target date.
+  let lo = 0, hi = rows.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (new Date(rows[mid].date).getTime() <= target) lo = mid; else hi = mid - 1;
+  }
+  return rows[lo].close;
 }
 
 function breadthLabel(v: number): { label: string; color: string } {
@@ -69,9 +108,9 @@ export function BreadthCsvDrop({ onSignals, initialSignals, spyReturn12m }: Prop
   const [signals, setSignals] = useState<BreadthSignals | null>(initialSignals ?? null);
 
   const computeAndEmit = useCallback((rows: { date: string; close: number }[], spyRet: number | null | undefined) => {
-    const latest     = rows[rows.length - 1];
-    const price52wAgo = rows[rows.length - 53]?.close ?? rows[0].close;
-    const rspReturn12m = ((latest.close - price52wAgo) / price52wAgo) * 100;
+    const latest         = rows[rows.length - 1];
+    const price12mAgo    = priceTwelveMonthsAgo(rows);
+    const rspReturn12m   = ((latest.close - price12mAgo) / price12mAgo) * 100;
 
     let breadth12mChg: number;
     let usedRatio: boolean;
@@ -130,13 +169,14 @@ export function BreadthCsvDrop({ onSignals, initialSignals, spyReturn12m }: Prop
       <div className="csv-intro">
         <h3>Market Breadth (RSP / SPY 12m)</h3>
         <p>
-          Drop a weekly RSP (Invesco S&P 500 Equal Weight ETF) CSV. Combined with the SPX CSV
-          above, this computes the RSP/SPY 12-month ratio change — a measure of how narrow or broad the rally is.
+          Drop an RSP (Invesco S&P 500 Equal Weight ETF) CSV — daily, weekly, or monthly is fine.
+          Combined with the SPX CSV above, this computes the RSP/SPY 12-month ratio change
+          (a measure of how narrow or broad the rally is).
         </p>
         <p>
-          <strong>TradingView:</strong> Search <code>RSP</code> → set to <strong>1W</strong> → right-click → <em>Export chart data…</em>
+          <strong>TradingView:</strong> Search <code>RSP</code> → set timeframe (<strong>1M</strong> recommended to match the SPX CSV) → right-click → <em>Export chart data…</em>
         </p>
-        <p>Expected columns: <code>time, open, high, low, close, volume</code> (Yahoo Finance also accepted)</p>
+        <p>Expected columns: <code>time, open, high, low, close, volume</code> (Yahoo Finance also accepted). Minimum 12 months of history.</p>
         {!spyReturn12m && (
           <p style={{ color: 'var(--warn)', fontSize: 12 }}>
             ⚠ Drop the SPX CSV first to get the full RSP/SPY ratio. Without it, RSP standalone 12m return is used.
@@ -153,14 +193,14 @@ export function BreadthCsvDrop({ onSignals, initialSignals, spyReturn12m }: Prop
         <input type="file" accept=".csv,text/csv" onChange={onFileChange} style={{ display: 'none' }} id="rsp-csv-input" />
         <label htmlFor="rsp-csv-input" className="csv-drop-label">
           {status === 'ok' ? '✓ ' : status === 'error' ? '✗ ' : '↓ '}
-          {status === 'idle' || status === 'hover' ? 'Drop RSP weekly CSV here or click to browse' : message}
+          {status === 'idle' || status === 'hover' ? 'Drop RSP CSV here or click to browse' : message}
         </label>
       </div>
 
       {signals && interp && (
         <div className="csv-results">
           <div className="csv-meta">
-            {signals.rows} weekly bars · through {signals.asOf}
+            {signals.rows} bars · through {signals.asOf}
             {' · '}{signals.usedRatio ? 'RSP/SPY ratio' : 'RSP standalone (drop SPX CSV for ratio)'}
           </div>
           <div className="csv-signals">

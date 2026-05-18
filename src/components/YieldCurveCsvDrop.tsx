@@ -21,9 +21,22 @@ export interface YieldCurveSignals {
 // ── CSV parser ─────────────────────────────────────────────────────────────────
 
 function normalizeDate(raw: string): string {
-  if (/^\d{9,11}$/.test(raw.trim()))
-    return new Date(parseInt(raw) * 1000).toISOString().slice(0, 10);
-  return raw.trim();
+  // See SpyCsvDrop.tsx for full rationale. Handles negative epochs (pre-1970)
+  // and 8-digit-or-fewer positives that the old `/^\d{9,11}$/` regex missed.
+  const t = raw.trim();
+  if (/^-?\d+$/.test(t)) {
+    const n = parseInt(t, 10);
+    const secs = Math.abs(n) >= 1e12 ? n / 1000 : n;
+    if (secs >= -5364662400 && secs <= 7258118400) {
+      const d = new Date(secs * 1000);
+      if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    }
+    throw new Error(`Date out of plausible range: "${raw}"`);
+  }
+  if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0, 10);
+  const d = new Date(t);
+  if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  throw new Error(`Unparseable date value: "${raw}"`);
 }
 
 function parseYieldCSV(text: string): { date: string; value: number }[] {

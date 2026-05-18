@@ -1,5 +1,5 @@
 /**
- * SPY Composite Scoring System v5.6
+ * SPY Composite Scoring System v5.7
  *
  * Model: SIGN-CONSTRAINED Ridge regression on rank-Gauss-normalised signals.
  * VIX excluded from predictors (kept for σ_t and UI percentiles).

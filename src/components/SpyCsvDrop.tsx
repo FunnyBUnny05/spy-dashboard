@@ -161,11 +161,31 @@ export function scoreFromSpySignals(sig: SpySignals) {
 // ── CSV parser ────────────────────────────────────────────────────────────────
 
 function normalizeDate(raw: string): string {
-  // Unix timestamp (TradingView sometimes exports these)
-  if (/^\d{9,11}$/.test(raw.trim())) {
-    return new Date(parseInt(raw) * 1000).toISOString().slice(0, 10);
+  // TradingView writes the `time` column as a signed unix epoch in seconds.
+  // History can go back to the 1800s, so this must accept:
+  //   - negative integers (pre-1970, e.g. SPX from 1871: `-3121407238`)
+  //   - any positive length (Jan 1970–Sept 1973 are 8 digits or fewer)
+  //   - 13-digit millisecond timestamps (some exports use ms)
+  // We then return ISO YYYY-MM-DD so lexicographic sort works correctly.
+  const t = raw.trim();
+  if (/^-?\d+$/.test(t)) {
+    const n = parseInt(t, 10);
+    const secs = Math.abs(n) >= 1e12 ? n / 1000 : n;
+    // Sanity-bound: 1800-01-01 .. 2200-01-01. Outside this range, treat as
+    // garbage rather than silently passing it through (which is what produced
+    // the "asOf 99844200" bug — the literal string sorted to the end).
+    if (secs >= -5364662400 && secs <= 7258118400) {
+      const d = new Date(secs * 1000);
+      if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    }
+    throw new Error(`Date out of plausible range: "${raw}"`);
   }
-  return raw.trim();
+  // ISO YYYY-MM-DD (Yahoo, FRED) — trim any trailing time portion.
+  if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0, 10);
+  // Last-ditch parse for other date formats (e.g. "Jan 1, 2024").
+  const d = new Date(t);
+  if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  throw new Error(`Unparseable date value: "${raw}"`);
 }
 
 function parseCSV(text: string): SpyRow[] {

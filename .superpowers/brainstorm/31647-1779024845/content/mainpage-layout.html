@@ -1,0 +1,132 @@
+<h2>Main page layout — new elements</h2>
+<p class="subtitle">Banner · 3-zone traffic light · Score with uncertainty · Sparkline · Reference card. Does this feel right?</p>
+
+<div class="mockup" style="max-width:900px;margin:0 auto">
+  <div class="mockup-header">SPY Composite Dashboard — main page (mockup)</div>
+  <div class="mockup-body" style="padding:0;background:#111;font-family:monospace;font-size:12px;color:#ccc">
+
+    <!-- EXIT BANNER -->
+    <div style="background:#7f1d1d;border-bottom:2px solid #ef4444;padding:10px 16px;display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+      <div>
+        <span style="color:#f87171;font-weight:700;font-size:13px">⚠ Q1 ZONE — DEFENSIVE</span>
+        <span style="margin-left:10px;color:#fca5a5;font-size:12px">Score 25.8 is below 30. Historical 12m return at Q1: −3.8%, 61% chance of being negative (n=18). Consider tightening stops.</span>
+      </div>
+      <span style="color:#f87171;cursor:pointer;font-size:16px;line-height:1">✕</span>
+    </div>
+
+    <!-- HEADER -->
+    <div style="background:#1a1a1a;padding:10px 16px;border-bottom:1px solid #333;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:#fff">SPY COMPOSITE SCORING SYSTEM v5.7</div>
+        <div style="font-size:10px;color:#666;margin-top:2px">Sign-constrained Ridge · 4 active signals · PPI 2026-03 · live ●</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <!-- 3-zone traffic light -->
+        <div style="display:flex;align-items:center;gap:6px;background:#1f1f1f;border:1px solid #333;border-radius:6px;padding:5px 10px">
+          <div style="width:10px;height:10px;border-radius:50%;background:#ef4444"></div>
+          <span style="color:#f87171;font-weight:700;font-size:12px">DEFENSIVE</span>
+          <span style="color:#666;font-size:10px">score &lt; 30</span>
+        </div>
+        <span style="background:#1f2937;color:#93c5fd;padding:3px 10px;border-radius:4px;font-size:12px">SCORE 25 <span style="color:#666">[20–31]</span></span>
+        <span style="background:#1f2937;color:#fbbf24;padding:3px 10px;border-radius:4px;font-size:12px">Ridge +8.4% 12m</span>
+      </div>
+    </div>
+
+    <!-- HERO ROW -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;padding:10px 16px;background:#161616">
+      <!-- Gauge + sparkline -->
+      <div style="background:#1f1f1f;border:1px solid #333;border-radius:6px;padding:10px">
+        <div style="font-size:10px;color:#888;margin-bottom:4px">COMPOSITE SCORE</div>
+        <div style="font-size:28px;font-weight:900;color:#ef4444">25 <span style="font-size:14px;color:#555">[20–31]</span></div>
+        <div style="font-size:10px;color:#f87171;margin:2px 0 6px">↓ crossed below 30 this month</div>
+        <!-- Mini sparkline mockup -->
+        <div style="position:relative;height:36px;background:#111;border-radius:3px;overflow:hidden">
+          <svg viewBox="0 0 120 36" style="width:100%;height:100%">
+            <!-- reference lines at 30 and 80 -->
+            <line x1="0" y1="26" x2="120" y2="26" stroke="#ef4444" stroke-width="0.5" stroke-dasharray="2,2" opacity="0.5"/>
+            <line x1="0" y1="8" x2="120" y2="8" stroke="#4ade80" stroke-width="0.5" stroke-dasharray="2,2" opacity="0.4"/>
+            <!-- score line (last 12m) -->
+            <polyline points="0,18 10,16 20,14 30,16 40,20 50,22 60,18 70,14 80,16 90,20 100,24 110,26 120,27"
+              fill="none" stroke="#60a5fa" stroke-width="1.5"/>
+            <!-- current dot -->
+            <circle cx="120" cy="27" r="2.5" fill="#ef4444"/>
+          </svg>
+          <div style="position:absolute;right:3px;top:2px;font-size:8px;color:#555">12m</div>
+          <div style="position:absolute;left:3px;top:24px;font-size:8px;color:#ef4444;opacity:0.7">30</div>
+          <div style="position:absolute;left:3px;top:4px;font-size:8px;color:#4ade80;opacity:0.6">80</div>
+        </div>
+        <div style="font-size:9px;color:#555;margin-top:4px">score 50 = ~15%/yr sample mean <span title="Score 50 equals the predicted return matching the 2009–2026 sample mean of ~15%/yr — above the long-run SPY average of ~10%. A score of ~40 corresponds to a neutral long-run expectation." style="color:#60a5fa;cursor:help">ⓘ</span></div>
+      </div>
+
+      <!-- Forward returns card -->
+      <div style="background:#1f1f1f;border:1px solid #333;border-radius:6px;padding:10px">
+        <div style="font-size:10px;color:#888;margin-bottom:6px">Q1 BUCKET · 12M FORWARD</div>
+        <div style="font-size:20px;font-weight:700;color:#ef4444">−3.8%</div>
+        <div style="font-size:10px;color:#888">mean · 61% negative</div>
+        <div style="font-size:10px;color:#666;margin-top:6px">95% CI [−10.8%, +3.3%]</div>
+        <div style="font-size:10px;color:#fca5a5;margin-top:4px">n=18 · n_eff=2 — wide CI</div>
+      </div>
+
+      <!-- AAII card -->
+      <div style="background:#1f1f1f;border:1px solid #333;border-radius:6px;padding:10px">
+        <div style="font-size:10px;color:#888;margin-bottom:6px">AAII SENTIMENT</div>
+        <div style="font-size:13px;color:#fbbf24">Retail crowded long</div>
+        <div style="font-size:10px;color:#888;margin-top:4px">z-spread +0.82 · 74th pct</div>
+      </div>
+
+      <!-- Exposure card -->
+      <div style="background:#1f1f1f;border:1px solid #333;border-radius:6px;padding:10px">
+        <div style="font-size:10px;color:#888;margin-bottom:6px">SUGGESTED EXPOSURE</div>
+        <div style="font-size:13px;color:#f87171;font-weight:700">DEFENSIVE</div>
+        <div style="font-size:10px;color:#888">Reduce exposure · tighten stops · no new buys</div>
+        <div style="font-size:9px;color:#555;margin-top:6px">Score &lt; 30 zone (TWO(30,80) walk-forward stable)</div>
+      </div>
+    </div>
+
+    <!-- REFERENCE CARD -->
+    <div style="margin:0 16px 10px;background:#0f1923;border:1px solid #1e3a5f;border-radius:6px;padding:10px">
+      <div style="font-size:10px;color:#60a5fa;font-weight:700;margin-bottom:6px">HISTORICAL REFERENCE · 12m forward returns by score range (2010–2026, n=136 months)</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;font-size:10px">
+        <div style="background:#2d0f0f;border:1px solid #7f1d1d;border-radius:4px;padding:6px;text-align:center">
+          <div style="color:#f87171;font-weight:700">0–20</div>
+          <div style="color:#888">n=18</div>
+          <div style="color:#ef4444;font-weight:700">−3.8%</div>
+          <div style="color:#888">61% neg</div>
+          <div style="color:#f87171;font-size:9px;margin-top:3px">DEFENSIVE</div>
+        </div>
+        <div style="background:#1c1c10;border:1px solid #3f3f00;border-radius:4px;padding:6px;text-align:center">
+          <div style="color:#fbbf24;font-weight:700">20–40</div>
+          <div style="color:#888">n=15</div>
+          <div style="color:#fbbf24;font-weight:700">+10.6%</div>
+          <div style="color:#888">7% neg</div>
+          <div style="color:#fbbf24;font-size:9px;margin-top:3px">NEUTRAL</div>
+        </div>
+        <div style="background:#0f1c0f;border:1px solid #14532d;border-radius:4px;padding:6px;text-align:center">
+          <div style="color:#4ade80;font-weight:700">40–60</div>
+          <div style="color:#888">n=35</div>
+          <div style="color:#4ade80;font-weight:700">+16.2%</div>
+          <div style="color:#888">0% neg</div>
+          <div style="color:#4ade80;font-size:9px;margin-top:3px">INVESTED</div>
+        </div>
+        <div style="background:#0f1c0f;border:1px solid #14532d;border-radius:4px;padding:6px;text-align:center">
+          <div style="color:#4ade80;font-weight:700">60–80</div>
+          <div style="color:#888">n=42</div>
+          <div style="color:#4ade80;font-weight:700">+15.5%</div>
+          <div style="color:#888">5% neg</div>
+          <div style="color:#4ade80;font-size:9px;margin-top:3px">INVESTED</div>
+        </div>
+        <div style="background:#0a1f0a;border:1px solid #166534;border-radius:4px;padding:6px;text-align:center">
+          <div style="color:#86efac;font-weight:700">80–100</div>
+          <div style="color:#888">n=26</div>
+          <div style="color:#86efac;font-weight:700">+25.0%</div>
+          <div style="color:#888">4% neg</div>
+          <div style="color:#86efac;font-size:9px;margin-top:3px">OPPORTUNITY</div>
+        </div>
+      </div>
+      <div style="font-size:9px;color:#555;margin-top:6px">n_eff for Q1, Q2, Q5 is 1–2 (non-overlapping obs). Point estimates informative; CIs are wide. Not a forecast.</div>
+    </div>
+
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px">Does this layout feel right? Key decisions: banner at top · traffic light in header badges · sparkline under the score number · reference card below the hero row. Let me know what to adjust.</p>
