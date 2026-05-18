@@ -78,3 +78,24 @@ export function sharpe(curve: number[]): number {
   const std = Math.sqrt(rets.reduce((a, b) => a + (b - mu) ** 2, 0) / (rets.length - 1));
   return std < 1e-12 ? NaN : (mu / std) * Math.sqrt(12);
 }
+
+/** Fraction of months where drawdown from peak exceeded `threshold` (e.g. -0.05 = 5%). */
+export function timeDDPct(curve: number[], threshold: number): number {
+  if (curve.length < 2) return 0;
+  let peak = -Infinity, count = 0;
+  for (const v of curve) {
+    if (v > peak) peak = v;
+    if ((v - peak) / peak < threshold) count++;
+  }
+  return count / curve.length;
+}
+
+/** Annualized volatility (std dev of monthly returns × √12). */
+export function annualVol(curve: number[]): number {
+  if (curve.length < 3) return NaN;
+  const rets: number[] = [];
+  for (let i = 1; i < curve.length; i++) rets.push(curve[i] / curve[i - 1] - 1);
+  const mu = rets.reduce((a, b) => a + b, 0) / rets.length;
+  const variance = rets.reduce((a, b) => a + (b - mu) ** 2, 0) / (rets.length - 1);
+  return Math.sqrt(variance * 12);
+}

@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Line } from 'react-chartjs-2';
 import { TsRow, DRIFT_LABEL } from '../lib/scoring';
 import { tickStyle, gridStyle } from '../lib/chartSetup';
-import { fiveTierExposure, buildCurve, cagr, maxDD, sharpe } from '../lib/backtest';
+import { fiveTierExposure, buildCurve, cagr, maxDD, sharpe, timeDDPct, annualVol } from '../lib/backtest';
 
 interface Props {
   timeseries: TsRow[];
@@ -109,6 +109,111 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
             Score {compositeScore.toFixed(1)} {b60Stance === 1.0 ? '≥ 60 → fully invested' : '< 60 → all cash'}<br />
             Binary rule: invest 100% only when score ≥ 60
           </div>
+        </div>
+      </div>
+
+      {/* Risk comparison table */}
+      <div className="chart-box" style={{ marginTop: 16 }}>
+        <div className="chart-title">
+          <span>Composite vs Buy &amp; Hold — risk-adjusted edge</span>
+        </div>
+        {(() => {
+          const ftMdd   = metrics.ft.mdd;
+          const bhMdd   = metrics.bh.mdd;
+          const ftCagr  = metrics.ft.cagr;
+          const bhCagr  = metrics.bh.cagr;
+          const ftSh    = metrics.ft.sharpe;
+          const bhSh    = metrics.bh.sharpe;
+          const ftVol   = annualVol(ft);
+          const bhVol   = annualVol(bh);
+          const ftTdd   = timeDDPct(ft, -0.05);
+          const bhTdd   = timeDDPct(bh, -0.05);
+
+          const cagrDiff = ftCagr - bhCagr;
+          const mddDiff  = ftMdd  - bhMdd;   // negative = composite has smaller (better) DD
+          const shDiff   = ftSh   - bhSh;
+          const volDiff  = ftVol  - bhVol;   // negative = composite less volatile (better)
+          const tddDiff  = ftTdd  - bhTdd;   // negative = composite less time underwater (better)
+
+          const bull = 'var(--bull,#4ade80)';
+          const bear = 'var(--bear)';
+          const neutral = 'var(--text2)';
+
+          const pp = (v: number) => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}pp`;
+          const pct2 = (v: number) => isNaN(v) ? '—' : `${(v * 100).toFixed(1)}%`;
+          const sh2  = (v: number) => isNaN(v) ? '—' : `${v >= 0 ? '+' : ''}${v.toFixed(2)}`;
+
+          const rows = [
+            {
+              metric: 'CAGR',
+              composite: pct2(ftCagr),
+              bh: pct2(bhCagr),
+              diff: pp(cagrDiff),
+              diffColor: Math.abs(cagrDiff) < 0.005 ? neutral : cagrDiff > 0 ? bull : bear,
+              note: Math.abs(cagrDiff) < 0.005 ? 'tied' : cagrDiff > 0 ? '↑ better' : '↓ worse',
+            },
+            {
+              metric: 'Max DD',
+              composite: pct2(ftMdd),
+              bh: pct2(bhMdd),
+              diff: pp(mddDiff),
+              diffColor: mddDiff < 0 ? bull : bear,
+              note: mddDiff < 0 ? '↓ less' : '↑ more',
+            },
+            {
+              metric: 'Sharpe',
+              composite: sh2(ftSh),
+              bh: sh2(bhSh),
+              diff: isNaN(shDiff) ? '—' : `${shDiff >= 0 ? '+' : ''}${shDiff.toFixed(2)}`,
+              diffColor: shDiff >= 0 ? bull : bear,
+              note: shDiff >= 0 ? 'better' : 'worse',
+            },
+            {
+              metric: 'Vol (ann.)',
+              composite: pct2(ftVol),
+              bh: pct2(bhVol),
+              diff: pp(volDiff),
+              diffColor: volDiff < 0 ? bull : bear,
+              note: volDiff < 0 ? '↓ less' : '↑ more',
+            },
+            {
+              metric: 'Time DD>5%',
+              composite: pct2(ftTdd),
+              bh: pct2(bhTdd),
+              diff: pp(tddDiff),
+              diffColor: tddDiff < 0 ? bull : bear,
+              note: tddDiff < 0 ? 'less stress' : 'more stress',
+            },
+          ];
+
+          return (
+            <table>
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th style={{ color: '#3d7fd4' }}>Composite (5-Tier)</th>
+                  <th style={{ color: '#565a61' }}>Buy &amp; Hold</th>
+                  <th>Diff</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(r => (
+                  <tr key={r.metric}>
+                    <td><strong>{r.metric}</strong></td>
+                    <td style={{ color: '#3d7fd4' }}>{r.composite}</td>
+                    <td style={{ color: '#565a61' }}>{r.bh}</td>
+                    <td style={{ color: r.diffColor }}>{r.diff}</td>
+                    <td style={{ color: r.diffColor, fontSize: 11 }}>{r.note}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          );
+        })()}
+        <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 6, padding: '0 4px' }}>
+          All metrics computed live from the same equity curves shown in the chart below.
+          Includes in-sample look-ahead — see Audit v2 for verified OOS numbers.
         </div>
       </div>
 
