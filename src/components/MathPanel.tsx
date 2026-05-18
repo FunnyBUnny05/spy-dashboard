@@ -18,6 +18,47 @@ export function MathPanel({ signals, composite }: Props) {
   const linCombo = signals.reduce((acc, s) => acc + s.ridgeCoef * s.zVal, 0);
 
   return (
+    <>
+    <div className="chart-box" style={{ marginTop: 16 }}>
+      <div className="chart-title">
+        <span>Regime-conditional Spearman ρ — pred vs realised 12m return</span>
+        <span style={{ color: 'var(--text3)', fontSize: 10 }}>source: v3 audit · docs/v3_audit/results.json</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Era</th>
+            <th>ρ</th>
+            <th>n</th>
+            <th>Interpretation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>2010–2015</td>
+            <td className="warn">+0.19</td>
+            <td style={{ color: 'var(--text3)' }}>61</td>
+            <td style={{ fontSize: 11, color: 'var(--text3)' }}>Model essentially didn't work</td>
+          </tr>
+          <tr>
+            <td>2016–2020</td>
+            <td style={{ color: '#60a5fa' }}>+0.38</td>
+            <td style={{ color: 'var(--text3)' }}>58</td>
+            <td style={{ fontSize: 11, color: 'var(--text3)' }}>Moderate fit</td>
+          </tr>
+          <tr>
+            <td>2021–2026</td>
+            <td className="bull">+0.82</td>
+            <td style={{ color: 'var(--text3)' }}>53</td>
+            <td style={{ fontSize: 11, color: 'var(--warn)' }}>Strong — but partly in-sample ⚠</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 8 }}>
+        2021–2026 ρ is partly in-sample — model was fitted on data through early 2025.
+        Earlier eras are fully out-of-sample. Trend suggests genuine improvement, not just overfitting.
+      </div>
+    </div>
     <div className="two-col">
       <div className="chart-box">
         <div className="chart-title"><span>v5.7 — Ridge regression · signal contributions</span></div>
@@ -96,5 +137,6 @@ export function MathPanel({ signals, composite }: Props) {
         </div>
       </div>
     </div>
+    </>
   );
 }
