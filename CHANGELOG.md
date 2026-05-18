@@ -5,6 +5,20 @@ Use it to avoid repeating the same mistakes.
 
 ---
 
+## [v5.7.3] — 2026-05-18
+
+### Audit findings Groups C, E, F — dashboard panels, proposals, test coverage
+
+- **C1 `src/components/StrategyPanel.tsx`, `src/lib/backtest.ts`** — Added live-computed risk comparison table above the equity curve. New helpers `timeDDPct()` and `annualVol()` in backtest.ts. Table shows CAGR (tied), Max DD (composite better), Sharpe (better), Vol (lower), Time DD>5% (less time underwater) — the actual case for the composite over B&H.
+- **C2 `src/components/BucketsPanel.tsx`** — Added PI coverage honesty badges: 95% PI labeled "(95% PI runs ~10pp narrow)" in amber (84.9% empirical vs 95% target); 80% CI labeled "(calibrated)" in muted (77.3% vs 80% target). Gauge.tsx unchanged — no PI display.
+- **C3 `src/components/MathPanel.tsx`** — Added regime-conditional Spearman ρ table at top of MathPanel: 2010-15 ρ=0.19, 2016-20 ρ=0.38, 2021-26 ρ=0.82 (warned as partly in-sample).
+- **E1 `docs/v3_audit/E1_threshold_proposal.md`** — Proposal: `stanceZoneFor` 3-zone system should be canonical; `scoreLabel` demoted to subtitle.
+- **E2 `docs/v3_audit/E2_calibration_proposal.md`** — Proposal: apply post-hoc isotonic recalibration to `pred` in `scoring.ts` to fix 3-7pp over-optimism in deciles 6-9.
+- **E3 `docs/v3_audit/E3_data_source_alignment.md`** — Proposal: add UI annotation near history chart explaining FRED vs TradingView/Yahoo ~4pt divergence.
+- **F `src/lib/__tests__/scoring.test.ts`, `src/lib/__tests__/backtest.test.ts`** — Broadened test coverage from 20 to 29 tests. New: `computeV2` smoke test, `bucketFor` boundary edges, `scoreAAII` integration, `fiveTierExposure` boundaries, `cagr` known series, `maxDD` known sequence, `sma10Exposure` behavior.
+
+---
+
 ## [v5.7.2] — 2026-05-18
 
 ### Audit findings Group A — code quality and honesty fixes
