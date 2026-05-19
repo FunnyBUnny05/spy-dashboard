@@ -1,9 +1,13 @@
-import { SignalSpec } from '../lib/scoring';
+import { useMemo } from 'react';
+import { Line } from 'react-chartjs-2';
+import { SignalSpec, TsRow, rollingOOSRho } from '../lib/scoring';
+import { tickStyle, gridStyle } from '../lib/chartSetup';
 import modelData from '../data/model.json';
 
 interface Props {
   signals: SignalSpec[];
   composite: number;
+  timeseries: TsRow[];
 }
 
 const DRIFT      = (modelData as any).drift        as number;
@@ -14,8 +18,36 @@ const ALPHA      = (modelData as any).ridge_alpha  as number;
 const RESID_VAR_A = (modelData as any).resid_var_a as number;
 const RESID_VAR_B = (modelData as any).resid_var_b as number;
 
-export function MathPanel({ signals, composite }: Props) {
+export function MathPanel({ signals, composite, timeseries }: Props) {
   const linCombo = signals.reduce((acc, s) => acc + s.ridgeCoef * s.zVal, 0);
+
+  const { rhoLabels, rhoValues } = useMemo(() => {
+    const rhos = rollingOOSRho(timeseries, 36);
+    const labels: string[] = [];
+    const values: (number | null)[] = [];
+    timeseries.forEach((row, i) => {
+      if (rhos[i] !== null) {
+        labels.push(row.date);
+        values.push(rhos[i]);
+      }
+    });
+    return { rhoLabels: labels, rhoValues: values };
+  }, [timeseries]);
+
+  const sparkData = {
+    labels: rhoLabels,
+    datasets: [
+      {
+        label: '36m OOS ρ',
+        data: rhoValues,
+        borderColor: '#60a5fa',
+        borderWidth: 1.5,
+        pointRadius: 0,
+        fill: false,
+        tension: 0.2,
+      },
+    ],
+  };
 
   return (
     <>
@@ -62,6 +94,44 @@ export function MathPanel({ signals, composite }: Props) {
         Pre-2017 OOS rho is statistically indistinguishable from zero.
         Treat the model as well-calibrated only for 2017+ data; earlier evidence is in-sample-contaminated.
         The 0.488 headline OOS ρ is almost entirely a 2021–2025 phenomenon.
+      </div>
+    </div>
+    {/* Rolling 36m OOS ρ sparkline */}
+    <div className="chart-box" style={{ marginTop: 16 }}>
+      <div className="chart-title">
+        <span>Rolling 36-month OOS ρ — score vs realised 12m forward return</span>
+        <span style={{ color: 'var(--text3)', fontSize: 10 }}>
+          Transparency only — trust-gating on rolling ρ reduces CAGR (see dead-ends doc)
+        </span>
+      </div>
+      <div className="chart-wrap" style={{ height: 160 }}>
+        <Line data={sparkData} options={{
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              mode: 'index' as const, intersect: false,
+              callbacks: { label: (c: any) => ` OOS ρ: ${c.parsed.y.toFixed(3)}` },
+            },
+          },
+          interaction: { mode: 'index' as const, intersect: false },
+          scales: {
+            x: { ticks: { ...tickStyle, maxTicksLimit: 10, maxRotation: 45 } as any, grid: gridStyle },
+            y: {
+              ticks: { ...tickStyle, callback: (v: any) => (v as number).toFixed(2) } as any,
+              grid: gridStyle,
+              min: -0.5,
+              max: 1.0,
+              title: { display: true, text: 'Spearman ρ', font: { size: 10, family: 'IBM Plex Mono' }, color: '#565a61' },
+            },
+          },
+        }} />
+      </div>
+      <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 6 }}>
+        Reference lines: y=0 (no skill), y=+0.2 (rough significance floor).
+        Min observed: −0.33 (≈2016-Q1) · Max: +0.88 · Median: +0.56.
+        Months with ρ&lt;0.1: ~40 of 161 (2015–2019 four-year stretch near zero).
       </div>
     </div>
     <div className="two-col">

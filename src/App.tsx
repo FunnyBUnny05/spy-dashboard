@@ -301,7 +301,7 @@ export default function App() {
         {tab==='playbook' && <PlaybookPanel stance={result.stance} />}
         {tab==='math'     && <>
           <VolRegimePanel timeseries={timeseries} />
-          <MathPanel signals={result.signals} composite={result.compositeScore} />
+          <MathPanel signals={result.signals} composite={result.compositeScore} timeseries={timeseries} />
         </>}
         {tab==='data'     && (
           <>
