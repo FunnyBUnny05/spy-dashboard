@@ -535,3 +535,43 @@ export function computeVolRegimeStats(rows: TsRow[]): VolRegimeStats {
     confidence,
   };
 }
+
+// ── Rolling OOS ρ (F3) ────────────────────────────────────────────────────────
+
+function spearmanRho(a: number[], b: number[]): number {
+  const rankOf = (arr: number[]) => {
+    const idx = arr.map((v, i) => ({ v, i })).sort((x, y) => x.v - y.v);
+    const r = new Array(arr.length);
+    idx.forEach((e, k) => { r[e.i] = k + 1; });
+    return r;
+  };
+  const ra = rankOf(a), rb = rankOf(b);
+  const n = a.length;
+  const ma = ra.reduce((s, x) => s + x, 0) / n;
+  const mb = rb.reduce((s, x) => s + x, 0) / n;
+  let num = 0, da = 0, db = 0;
+  for (let i = 0; i < n; i++) {
+    num += (ra[i] - ma) * (rb[i] - mb);
+    da  += (ra[i] - ma) ** 2;
+    db  += (rb[i] - mb) ** 2;
+  }
+  return num / Math.sqrt(da * db);
+}
+
+/** 36-month trailing Spearman ρ of score vs realized 12m forward return.
+ *  Returns null until 12 (score, realized_fwd12) pairs exist in the window. */
+export function rollingOOSRho(rows: TsRow[], windowMonths: number = 36): (number | null)[] {
+  const out: (number | null)[] = rows.map(() => null);
+  const pairs: Array<{ i: number; score: number; fwd: number }> = [];
+  for (let i = 0; i + 12 < rows.length; i++) {
+    if (rows[i].score == null || rows[i].spy == null || rows[i + 12].spy == null) continue;
+    pairs.push({ i, score: rows[i].score!, fwd: rows[i + 12].spy / rows[i].spy - 1 });
+  }
+  for (let p = 0; p < pairs.length; p++) {
+    const cutoff = pairs[p].i;
+    const pairsInWindow = pairs.filter(q => q.i <= cutoff && q.i > cutoff - windowMonths);
+    if (pairsInWindow.length < 12) continue;
+    out[cutoff] = spearmanRho(pairsInWindow.map(w => w.score), pairsInWindow.map(w => w.fwd));
+  }
+  return out;
+}

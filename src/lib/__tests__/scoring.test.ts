@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { stanceZoneFor, scoreUncertainty, computeV2, bucketFor, BUCKETS, scoreAAII, getAAIIData, classifyVolRegime } from '../scoring';
+import { stanceZoneFor, scoreUncertainty, computeV2, bucketFor, BUCKETS, scoreAAII, getAAIIData, classifyVolRegime, rollingOOSRho, getTimeseries } from '../scoring';
 import { CURRENT } from '../snapshot';
 
 describe('stanceZoneFor', () => {
@@ -108,5 +108,24 @@ describe('classifyVolRegime', () => {
   it('returns high for vol >= 0.185', () => {
     expect(classifyVolRegime(0.185)).toBe('high');
     expect(classifyVolRegime(0.30)).toBe('high');
+  });
+});
+
+describe('rollingOOSRho', () => {
+  it('returns all nulls when fewer than 12+12 rows', () => {
+    const ts = getTimeseries().slice(0, 20);
+    const result = rollingOOSRho(ts, 36);
+    expect(result.every(v => v === null)).toBe(true);
+  });
+
+  it('returns a non-null value for the full timeseries at a late row', () => {
+    const ts = getTimeseries();
+    const result = rollingOOSRho(ts, 36);
+    const nonNull = result.filter(v => v !== null);
+    expect(nonNull.length).toBeGreaterThan(0);
+    nonNull.forEach(v => {
+      expect(v!).toBeGreaterThanOrEqual(-1);
+      expect(v!).toBeLessThanOrEqual(1);
+    });
   });
 });
