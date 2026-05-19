@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fiveTierExposure, cagr, maxDD, sharpe, sma10Exposure } from '../backtest';
+import { fiveTierExposure, twoZoneExposure, cagr, maxDD, sharpe, sma10Exposure, buildCurve } from '../backtest';
 import type { TsRow } from '../scoring';
 
 describe('fiveTierExposure', () => {
@@ -50,6 +50,37 @@ describe('maxDD', () => {
 describe('sharpe', () => {
   it('returns NaN for fewer than 13 points', () => {
     expect(sharpe([100, 110])).toBeNaN();
+  });
+});
+
+describe('twoZoneExposure', () => {
+  it('returns 0 below 30', () => {
+    expect(twoZoneExposure(0)).toBe(0);
+    expect(twoZoneExposure(29.9)).toBe(0);
+  });
+  it('returns 1 from 30 to just below 80', () => {
+    expect(twoZoneExposure(30)).toBe(1.0);
+    expect(twoZoneExposure(79.9)).toBe(1.0);
+  });
+  it('returns 1.2 at 80 and above', () => {
+    expect(twoZoneExposure(80)).toBe(1.2);
+    expect(twoZoneExposure(100)).toBe(1.2);
+  });
+});
+
+describe('buildCurve includes tz', () => {
+  it('returns a tz array the same length as bh', () => {
+    const ts = Array.from({ length: 20 }, (_, i) => ({
+      date: `2020-${String(i + 1).padStart(2, '0')}`,
+      spy: 100 + i,
+      score: 50,
+      pred: 0.1,
+      regime: '',
+      inSample: false,
+    })) as TsRow[];
+    const curve = buildCurve(ts);
+    expect(curve.tz).toBeDefined();
+    expect(curve.tz.length).toBe(curve.bh.length);
   });
 });
 

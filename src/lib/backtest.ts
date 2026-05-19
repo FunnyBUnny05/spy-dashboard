@@ -17,6 +17,16 @@ export function veto30Exposure(score: number): number {
   return score >= 30 ? 1.0 : 0.0;
 }
 
+/** Two-zone exposure rule (walk-forward optimal across 10 folds in the
+ *  v3 audit threshold_opt.py run). Cash below 30, full long 30–80,
+ *  1.2× above 80. Beats fiveTier by ~1.6pp CAGR on the v5.7 sample,
+ *  same Sharpe, higher MaxDD. */
+export function twoZoneExposure(score: number): number {
+  if (score >= 80) return 1.2;
+  if (score >= 30) return 1.0;
+  return 0.0;
+}
+
 /** 10-month moving average filter — long when SPY price > SMA10, else cash.
  *  Approximates the classic 200-day MA strategy on monthly data. */
 export function sma10Exposure(rows: TsRow[], i: number): number {
@@ -27,7 +37,7 @@ export function sma10Exposure(rows: TsRow[], i: number): number {
   return rows[i].spy > sma ? 1.0 : 0.0;
 }
 
-export function buildCurve(timeseries: TsRow[]): { labels: string[]; bh: number[]; ft: number[]; b60: number[]; sma: number[]; veto30: number[] } {
+export function buildCurve(timeseries: TsRow[]): { labels: string[]; bh: number[]; ft: number[]; b60: number[]; sma: number[]; veto30: number[]; tz: number[] } {
   // Use ALL consecutive monthly rows (not just scored ones) to avoid
   // multi-month return jumps across scoring gaps.
   // Score is carried forward from the most recent scored month.
@@ -38,11 +48,12 @@ export function buildCurve(timeseries: TsRow[]): { labels: string[]; bh: number[
   const b60: number[] = [];
   const sma: number[] = [];
   const veto30: number[] = [];
+  const tz: number[] = [];
 
-  let bhV = 100, ftV = 100, b60V = 100, smaV = 100, veto30V = 100;
+  let bhV = 100, ftV = 100, b60V = 100, smaV = 100, veto30V = 100, tzV = 100;
   let lastScore: number | null = null;
   const firstScored = rows.findIndex(r => r.score !== null);
-  if (firstScored < 0) return { labels, bh, ft, b60, sma, veto30 };
+  if (firstScored < 0) return { labels, bh, ft, b60, sma, veto30, tz };
 
   for (let i = firstScored; i < rows.length - 1; i++) {
     if (rows[i].score !== null) lastScore = rows[i].score;
@@ -53,14 +64,16 @@ export function buildCurve(timeseries: TsRow[]): { labels: string[]; bh: number[
     b60V    *= (1 + binaryExposure(lastScore) * ret);
     smaV    *= (1 + sma10Exposure(rows, i) * ret);
     veto30V *= (1 + veto30Exposure(lastScore) * ret);
+    tzV     *= (1 + twoZoneExposure(lastScore) * ret);
     labels.push(rows[i + 1].date);
     bh.push(+bhV.toFixed(2));
     ft.push(+ftV.toFixed(2));
     b60.push(+b60V.toFixed(2));
     sma.push(+smaV.toFixed(2));
     veto30.push(+veto30V.toFixed(2));
+    tz.push(+tzV.toFixed(2));
   }
-  return { labels, bh, ft, b60, sma, veto30 };
+  return { labels, bh, ft, b60, sma, veto30, tz };
 }
 
 export function cagr(curve: number[], nMonths: number): number {
