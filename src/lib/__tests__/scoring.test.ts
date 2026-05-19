@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { stanceZoneFor, scoreUncertainty, computeV2, bucketFor, BUCKETS, scoreAAII, getAAIIData } from '../scoring';
+import { stanceZoneFor, scoreUncertainty, computeV2, bucketFor, BUCKETS, scoreAAII, getAAIIData, classifyVolRegime } from '../scoring';
 import { CURRENT } from '../snapshot';
 
 describe('stanceZoneFor', () => {
@@ -89,5 +89,24 @@ describe('scoreUncertainty', () => {
     const { lo, hi } = scoreUncertainty(0.15, 0, 0.15);
     expect(lo).toBe(50);
     expect(hi).toBe(50);
+  });
+});
+
+describe('classifyVolRegime', () => {
+  it('returns low for vol below 0.10', () => {
+    expect(classifyVolRegime(0.05)).toBe('low');
+    expect(classifyVolRegime(0.099)).toBe('low');
+  });
+  it('returns mid_low for vol [0.10, 0.135)', () => {
+    expect(classifyVolRegime(0.10)).toBe('mid_low');
+    expect(classifyVolRegime(0.134)).toBe('mid_low');
+  });
+  it('returns mid_high for vol [0.135, 0.185)', () => {
+    expect(classifyVolRegime(0.135)).toBe('mid_high');
+    expect(classifyVolRegime(0.184)).toBe('mid_high');
+  });
+  it('returns high for vol >= 0.185', () => {
+    expect(classifyVolRegime(0.185)).toBe('high');
+    expect(classifyVolRegime(0.30)).toBe('high');
   });
 });

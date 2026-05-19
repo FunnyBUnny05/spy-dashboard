@@ -481,3 +481,52 @@ export function scoreAAII(history: AAIIReading[], stats: AAIIStats): AAIIResult 
   const desc = `Z-spread ${zSpread >= 0 ? '+' : ''}${zSpread.toFixed(2)} · ${pctStocks.toFixed(0)}th pct stocks`;
   return { reading, stats, zSpread, pctStocks, pctCash, spread: currentSpread, score, flag, flagLabel, raw, desc, staleDays };
 }
+
+// ── Vol-regime classification (F1) ───────────────────────────────────────────
+
+export type VolRegime = 'low' | 'mid_low' | 'mid_high' | 'high';
+
+export interface VolRegimeStats {
+  current: VolRegime;
+  currentVol: number;    // annualized 12m realized vol
+  rhoLow:     number;    // −0.272
+  rhoMidLow:  number;    // +0.535
+  rhoMidHigh: number;    // +0.770
+  rhoHigh:    number;    // +0.267
+  confidence: 'wrong-signed' | 'low' | 'high' | 'modest';
+}
+
+/** Classify a 12m realized vol into the OOS-derived regime buckets. */
+export function classifyVolRegime(vol12: number): VolRegime {
+  if (vol12 < 0.10)  return 'low';      // ρ_OOS = −0.272
+  if (vol12 < 0.135) return 'mid_low';  // ρ_OOS = +0.535
+  if (vol12 < 0.185) return 'mid_high'; // ρ_OOS = +0.770
+  return 'high';                         // ρ_OOS = +0.267
+}
+
+/** Compute current 12m realized vol and classify regime from timeseries rows. */
+export function computeVolRegimeStats(rows: TsRow[]): VolRegimeStats {
+  const spyRows = rows.filter(r => r.spy != null && r.spy > 0);
+  const n = spyRows.length;
+  const window = Math.min(12, n - 1);
+  const rets: number[] = [];
+  for (let i = n - window; i < n; i++) {
+    rets.push(spyRows[i].spy / spyRows[i - 1].spy - 1);
+  }
+  const mean = rets.reduce((a, b) => a + b, 0) / rets.length;
+  const variance = rets.reduce((a, b) => a + (b - mean) ** 2, 0) / (rets.length - 1);
+  const currentVol = Math.sqrt(variance * 12);
+
+  const current = classifyVolRegime(currentVol);
+  const confidence: VolRegimeStats['confidence'] =
+    current === 'low'      ? 'wrong-signed' :
+    current === 'mid_high' ? 'high'         :
+    current === 'mid_low'  ? 'low'          :
+    'modest';
+
+  return {
+    current, currentVol,
+    rhoLow: -0.272, rhoMidLow: 0.535, rhoMidHigh: 0.770, rhoHigh: 0.267,
+    confidence,
+  };
+}
