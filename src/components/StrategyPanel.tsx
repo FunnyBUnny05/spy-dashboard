@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Line } from 'react-chartjs-2';
 import { TsRow, DRIFT_LABEL } from '../lib/scoring';
 import { tickStyle, gridStyle } from '../lib/chartSetup';
-import { fiveTierExposure, buildCurve, cagr, maxDD, sharpe, timeDDPct, annualVol } from '../lib/backtest';
+import { fiveTierExposure, twoZoneExposure, buildCurve, cagr, maxDD, sharpe, timeDDPct, annualVol } from '../lib/backtest';
 
 interface Props {
   timeseries: TsRow[];
@@ -14,7 +14,7 @@ function binaryExposure(score: number): number {
 }
 
 export function StrategyPanel({ timeseries, compositeScore }: Props) {
-  const { labels, bh, ft, b60, sma, veto30 } = useMemo(() => buildCurve(timeseries), [timeseries]);
+  const { labels, bh, ft, b60, sma, veto30, tz } = useMemo(() => buildCurve(timeseries), [timeseries]);
   const n = labels.length;
 
   const metrics = useMemo(() => ({
@@ -23,7 +23,8 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
     b60:    { cagr: cagr(b60, n),    mdd: maxDD(b60),    sharpe: sharpe(b60)    },
     sma:    { cagr: cagr(sma, n),    mdd: maxDD(sma),    sharpe: sharpe(sma)    },
     veto30: { cagr: cagr(veto30, n), mdd: maxDD(veto30), sharpe: sharpe(veto30) },
-  }), [bh, ft, b60, sma, veto30, n]);
+    tz:     { cagr: cagr(tz, n),     mdd: maxDD(tz),     sharpe: sharpe(tz)     },
+  }), [bh, ft, b60, sma, veto30, tz, n]);
 
   const ftStance = fiveTierExposure(compositeScore);
   const b60Stance = binaryExposure(compositeScore);
@@ -74,6 +75,15 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
         tension: 0.2,
       },
       {
+        label: 'TWO(30,80)',
+        data: tz,
+        borderColor: '#a78bfa',
+        borderWidth: 1.5,
+        pointRadius: 0,
+        fill: false,
+        tension: 0.2,
+      },
+      {
         label: 'Veto<30',
         data: veto30,
         borderColor: '#f59e0b',
@@ -112,6 +122,19 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
           </div>
         </div>
         <div className="card" style={{ flex: 1 }}>
+          <div className="stat-label">TWO(30,80) current stance</div>
+          <div className="stat-val" style={{
+            color: compositeScore >= 80 ? 'var(--bull,#4ade80)' : compositeScore >= 30 ? 'var(--text)' : 'var(--bear)',
+            marginTop: 8
+          }}>
+            {compositeScore >= 80 ? 'OPPORTUNITY (120%)' : compositeScore >= 30 ? 'LONG (100%)' : 'CASH (0%)'}
+          </div>
+          <div className="stat-sub">
+            Score {compositeScore.toFixed(1)} → {Math.round(twoZoneExposure(compositeScore) * 100)}% equity exposure<br />
+            <span style={{ fontSize: '0.75em', opacity: 0.6 }}>Walk-forward winner: +1.6pp CAGR vs 5-Tier, same Sharpe, higher MaxDD</span>
+          </div>
+        </div>
+        <div className="card" style={{ flex: 1 }}>
           <div className="stat-label">Binary ≥60 current stance</div>
           <div className="stat-val" style={{ color: b60Color, marginTop: 8 }}>
             {b60Stance === 1.0 ? 'LONG (100%)' : 'CASH (0%)'}
@@ -132,18 +155,23 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
           const ftMdd     = metrics.ft.mdd;
           const bhMdd     = metrics.bh.mdd;
           const v30Mdd    = metrics.veto30.mdd;
+          const tzMdd     = metrics.tz.mdd;
           const ftCagr    = metrics.ft.cagr;
           const bhCagr    = metrics.bh.cagr;
           const v30Cagr   = metrics.veto30.cagr;
+          const tzCagr    = metrics.tz.cagr;
           const ftSh      = metrics.ft.sharpe;
           const bhSh      = metrics.bh.sharpe;
           const v30Sh     = metrics.veto30.sharpe;
+          const tzSh      = metrics.tz.sharpe;
           const ftVol     = annualVol(ft);
           const bhVol     = annualVol(bh);
           const v30Vol    = annualVol(veto30);
+          const tzVol     = annualVol(tz);
           const ftTdd     = timeDDPct(ft, -0.05);
           const bhTdd     = timeDDPct(bh, -0.05);
           const v30Tdd    = timeDDPct(veto30, -0.05);
+          const tzTdd     = timeDDPct(tz, -0.05);
 
           const bull = 'var(--bull,#4ade80)';
           const bear = 'var(--bear)';
@@ -155,6 +183,7 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
           const rows = [
             {
               metric: 'CAGR',
+              tz: pct2(tzCagr),
               ft: pct2(ftCagr),
               veto30: pct2(v30Cagr),
               bh: pct2(bhCagr),
@@ -163,6 +192,7 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
             },
             {
               metric: 'Max DD',
+              tz: pct2(tzMdd),
               ft: pct2(ftMdd),
               veto30: pct2(v30Mdd),
               bh: pct2(bhMdd),
@@ -171,6 +201,7 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
             },
             {
               metric: 'Sharpe',
+              tz: sh2(tzSh),
               ft: sh2(ftSh),
               veto30: sh2(v30Sh),
               bh: sh2(bhSh),
@@ -179,6 +210,7 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
             },
             {
               metric: 'Vol (ann.)',
+              tz: pct2(tzVol),
               ft: pct2(ftVol),
               veto30: pct2(v30Vol),
               bh: pct2(bhVol),
@@ -187,6 +219,7 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
             },
             {
               metric: 'Time DD>5%',
+              tz: pct2(tzTdd),
               ft: pct2(ftTdd),
               veto30: pct2(v30Tdd),
               bh: pct2(bhTdd),
@@ -200,6 +233,7 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
               <thead>
                 <tr>
                   <th>Metric</th>
+                  <th style={{ color: '#a78bfa' }}>TWO(30,80)</th>
                   <th style={{ color: '#3d7fd4' }}>5-Tier</th>
                   <th style={{ color: '#f59e0b' }}>Veto&lt;30</th>
                   <th style={{ color: '#565a61' }}>Buy &amp; Hold</th>
@@ -210,6 +244,7 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
                 {rows.map(r => (
                   <tr key={r.metric}>
                     <td><strong>{r.metric}</strong></td>
+                    <td style={{ color: '#a78bfa' }}>{r.tz}</td>
                     <td style={{ color: '#3d7fd4' }}>{r.ft}</td>
                     <td style={{ color: '#f59e0b' }}>{r.veto30}</td>
                     <td style={{ color: '#565a61' }}>{r.bh}</td>
@@ -235,6 +270,7 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
               { color: '#565a61', label: 'Buy & Hold', dash: true },
               { color: '#3d7fd4', label: '5-Tier' },
               { color: '#1fa876', label: 'Binary ≥60' },
+              { color: '#a78bfa', label: 'TWO(30,80)' },
               { color: '#f59e0b', label: 'Veto<30', dash: true },
               { color: '#d62728', label: '10m SMA', dash: true },
             ].map(({ color, label, dash }) => (
@@ -301,6 +337,7 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
               { label: 'Buy & Hold',   m: metrics.bh,     curve: bh,     color: '#565a61' },
               { label: '5-Tier',       m: metrics.ft,     curve: ft,     color: '#3d7fd4' },
               { label: 'Binary ≥60',   m: metrics.b60,    curve: b60,    color: '#1fa876' },
+              { label: 'TWO(30,80)',   m: metrics.tz,     curve: tz,     color: '#a78bfa' },
               { label: 'Veto<30',      m: metrics.veto30, curve: veto30, color: '#f59e0b' },
               { label: '10m SMA',      m: metrics.sma,    curve: sma,    color: '#d62728' },
             ].map(({ label, m, curve, color }) => (
@@ -314,6 +351,10 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="callout callout-info" style={{ marginTop: 8 }}>
+        <strong>TWO(30,80) vs 5-Tier tradeoff:</strong> TWO(30,80) is the walk-forward-optimal threshold pair from the v3 audit (10-fold cross-validation on OOS months). It trades drawdown protection for ~1.6pp/yr higher CAGR at the same Sharpe. 5-Tier provides a smoother equity curve with less drawdown. Neither outperforms Binary ≥60 on a risk-adjusted basis in the OOS audit.
       </div>
 
       {/* OOS audit reference */}
