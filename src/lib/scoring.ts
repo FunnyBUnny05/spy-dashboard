@@ -508,9 +508,14 @@ export function classifyVolRegime(vol12: number): VolRegime {
 export function computeVolRegimeStats(rows: TsRow[]): VolRegimeStats {
   const spyRows = rows.filter(r => r.spy != null && r.spy > 0);
   const n = spyRows.length;
-  const window = Math.min(12, n - 1);
+  if (n < 3) {
+    return { current: 'mid_high', currentVol: NaN,
+             rhoLow: -0.272, rhoMidLow: 0.535, rhoMidHigh: 0.770, rhoHigh: 0.267,
+             confidence: 'high' };
+  }
+  const lookback = Math.min(12, n - 1);
   const rets: number[] = [];
-  for (let i = n - window; i < n; i++) {
+  for (let i = n - lookback; i < n; i++) {
     rets.push(spyRows[i].spy / spyRows[i - 1].spy - 1);
   }
   const mean = rets.reduce((a, b) => a + b, 0) / rets.length;
