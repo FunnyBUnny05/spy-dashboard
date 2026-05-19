@@ -21,7 +21,7 @@ const RESID_VAR_B = (modelData as any).resid_var_b as number;
 export function MathPanel({ signals, composite, timeseries }: Props) {
   const linCombo = signals.reduce((acc, s) => acc + s.ridgeCoef * s.zVal, 0);
 
-  const { rhoLabels, rhoValues } = useMemo(() => {
+  const { sparkData } = useMemo(() => {
     const rhos = rollingOOSRho(timeseries, 36);
     const labels: string[] = [];
     const values: (number | null)[] = [];
@@ -31,23 +31,22 @@ export function MathPanel({ signals, composite, timeseries }: Props) {
         values.push(rhos[i]);
       }
     });
-    return { rhoLabels: labels, rhoValues: values };
+    const data = {
+      labels,
+      datasets: [
+        {
+          label: '36m OOS ρ',
+          data: values,
+          borderColor: '#60a5fa',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          fill: false,
+          tension: 0.2,
+        },
+      ],
+    };
+    return { sparkData: data };
   }, [timeseries]);
-
-  const sparkData = {
-    labels: rhoLabels,
-    datasets: [
-      {
-        label: '36m OOS ρ',
-        data: rhoValues,
-        borderColor: '#60a5fa',
-        borderWidth: 1.5,
-        pointRadius: 0,
-        fill: false,
-        tension: 0.2,
-      },
-    ],
-  };
 
   return (
     <>
