@@ -31,6 +31,7 @@ import { StrategyPanel }    from './components/StrategyPanel';
 import { AlertBanner }      from './components/AlertBanner';
 import { ThresholdsCard }   from './components/ThresholdsCard';
 import { TrackRecordPanel } from './components/TrackRecordPanel';
+import { VolRegimePanel }  from './components/VolRegimePanel';
 import { stanceZoneFor }    from './lib/scoring';
 
 type TabId = 'buckets' | 'history' | 'strategy' | 'trackrecord' | 'buffett' | 'aaii' | 'playbook' | 'math' | 'data';
@@ -298,7 +299,10 @@ export default function App() {
         {tab==='aaii'     && <AAIIPanel aaii={aaii} history={aaiiHistory} />}
         {tab==='buffett'  && <BuffettPanel />}
         {tab==='playbook' && <PlaybookPanel stance={result.stance} />}
-        {tab==='math'     && <MathPanel signals={result.signals} composite={result.compositeScore} />}
+        {tab==='math'     && <>
+          <VolRegimePanel timeseries={timeseries} />
+          <MathPanel signals={result.signals} composite={result.compositeScore} />
+        </>}
         {tab==='data'     && (
           <>
             <SpyCsvDrop onSignals={handleSpySignals} initialSignals={spySignals} />
