@@ -124,7 +124,7 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
         <div className="card" style={{ flex: 1 }}>
           <div className="stat-label">TWO(30,80) current stance</div>
           <div className="stat-val" style={{
-            color: compositeScore >= 80 ? 'var(--bull,#4ade80)' : compositeScore >= 30 ? 'var(--text)' : 'var(--bear)',
+            color: compositeScore >= 80 ? 'var(--bull,#4ade80)' : compositeScore >= 30 ? 'var(--bull,#4ade80)' : 'var(--bear)',
             marginTop: 8
           }}>
             {compositeScore >= 80 ? 'OPPORTUNITY (120%)' : compositeScore >= 30 ? 'LONG (100%)' : 'CASH (0%)'}
