@@ -14,15 +14,16 @@ function binaryExposure(score: number): number {
 }
 
 export function StrategyPanel({ timeseries, compositeScore }: Props) {
-  const { labels, bh, ft, b60, sma } = useMemo(() => buildCurve(timeseries), [timeseries]);
+  const { labels, bh, ft, b60, sma, veto30 } = useMemo(() => buildCurve(timeseries), [timeseries]);
   const n = labels.length;
 
   const metrics = useMemo(() => ({
-    bh:  { cagr: cagr(bh, n),  mdd: maxDD(bh),  sharpe: sharpe(bh)  },
-    ft:  { cagr: cagr(ft, n),  mdd: maxDD(ft),  sharpe: sharpe(ft)  },
-    b60: { cagr: cagr(b60, n), mdd: maxDD(b60), sharpe: sharpe(b60) },
-    sma: { cagr: cagr(sma, n), mdd: maxDD(sma), sharpe: sharpe(sma) },
-  }), [bh, ft, b60, sma, n]);
+    bh:     { cagr: cagr(bh, n),     mdd: maxDD(bh),     sharpe: sharpe(bh)     },
+    ft:     { cagr: cagr(ft, n),     mdd: maxDD(ft),     sharpe: sharpe(ft)     },
+    b60:    { cagr: cagr(b60, n),    mdd: maxDD(b60),    sharpe: sharpe(b60)    },
+    sma:    { cagr: cagr(sma, n),    mdd: maxDD(sma),    sharpe: sharpe(sma)    },
+    veto30: { cagr: cagr(veto30, n), mdd: maxDD(veto30), sharpe: sharpe(veto30) },
+  }), [bh, ft, b60, sma, veto30, n]);
 
   const ftStance = fiveTierExposure(compositeScore);
   const b60Stance = binaryExposure(compositeScore);
@@ -73,6 +74,16 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
         tension: 0.2,
       },
       {
+        label: 'Veto<30',
+        data: veto30,
+        borderColor: '#f59e0b',
+        borderWidth: 1.2,
+        pointRadius: 0,
+        fill: false,
+        tension: 0.2,
+        borderDash: [2, 2],
+      },
+      {
         label: '10m SMA',
         data: sma,
         borderColor: '#d62728',
@@ -115,74 +126,72 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
       {/* Risk comparison table */}
       <div className="chart-box" style={{ marginTop: 16 }}>
         <div className="chart-title">
-          <span>Composite vs Buy &amp; Hold — risk-adjusted edge</span>
+          <span>Composite trades CAGR for drawdown reduction — it does not deliver more return than B&amp;H on this sample</span>
         </div>
         {(() => {
-          const ftMdd   = metrics.ft.mdd;
-          const bhMdd   = metrics.bh.mdd;
-          const ftCagr  = metrics.ft.cagr;
-          const bhCagr  = metrics.bh.cagr;
-          const ftSh    = metrics.ft.sharpe;
-          const bhSh    = metrics.bh.sharpe;
-          const ftVol   = annualVol(ft);
-          const bhVol   = annualVol(bh);
-          const ftTdd   = timeDDPct(ft, -0.05);
-          const bhTdd   = timeDDPct(bh, -0.05);
-
-          const cagrDiff = ftCagr - bhCagr;
-          const mddDiff  = ftMdd  - bhMdd;   // negative = composite has smaller (better) DD
-          const shDiff   = ftSh   - bhSh;
-          const volDiff  = ftVol  - bhVol;   // negative = composite less volatile (better)
-          const tddDiff  = ftTdd  - bhTdd;   // negative = composite less time underwater (better)
+          const ftMdd     = metrics.ft.mdd;
+          const bhMdd     = metrics.bh.mdd;
+          const v30Mdd    = metrics.veto30.mdd;
+          const ftCagr    = metrics.ft.cagr;
+          const bhCagr    = metrics.bh.cagr;
+          const v30Cagr   = metrics.veto30.cagr;
+          const ftSh      = metrics.ft.sharpe;
+          const bhSh      = metrics.bh.sharpe;
+          const v30Sh     = metrics.veto30.sharpe;
+          const ftVol     = annualVol(ft);
+          const bhVol     = annualVol(bh);
+          const v30Vol    = annualVol(veto30);
+          const ftTdd     = timeDDPct(ft, -0.05);
+          const bhTdd     = timeDDPct(bh, -0.05);
+          const v30Tdd    = timeDDPct(veto30, -0.05);
 
           const bull = 'var(--bull,#4ade80)';
           const bear = 'var(--bear)';
           const neutral = 'var(--text2)';
 
-          const pp = (v: number) => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}pp`;
           const pct2 = (v: number) => isNaN(v) ? '—' : `${(v * 100).toFixed(1)}%`;
           const sh2  = (v: number) => isNaN(v) ? '—' : `${v >= 0 ? '+' : ''}${v.toFixed(2)}`;
 
           const rows = [
             {
               metric: 'CAGR',
-              composite: pct2(ftCagr),
+              ft: pct2(ftCagr),
+              veto30: pct2(v30Cagr),
               bh: pct2(bhCagr),
-              diff: pp(cagrDiff),
-              diffColor: Math.abs(cagrDiff) < 0.005 ? neutral : cagrDiff > 0 ? bull : bear,
-              note: Math.abs(cagrDiff) < 0.005 ? 'tied' : cagrDiff > 0 ? '↑ better' : '↓ worse',
+              ftColor: Math.abs(ftCagr - bhCagr) < 0.005 ? neutral : ftCagr > bhCagr ? bull : bear,
+              note: Math.abs(ftCagr - bhCagr) < 0.005 ? 'tied vs B&H' : ftCagr > bhCagr ? '5T↑ vs B&H' : '5T↓ vs B&H',
             },
             {
               metric: 'Max DD',
-              composite: pct2(ftMdd),
+              ft: pct2(ftMdd),
+              veto30: pct2(v30Mdd),
               bh: pct2(bhMdd),
-              diff: pp(mddDiff),
-              diffColor: mddDiff < 0 ? bull : bear,
-              note: mddDiff < 0 ? '↓ less' : '↑ more',
+              ftColor: ftMdd < bhMdd ? bull : bear,
+              note: ftMdd < bhMdd ? '5T less drawdown' : '5T more drawdown',
             },
             {
               metric: 'Sharpe',
-              composite: sh2(ftSh),
+              ft: sh2(ftSh),
+              veto30: sh2(v30Sh),
               bh: sh2(bhSh),
-              diff: isNaN(shDiff) ? '—' : `${shDiff >= 0 ? '+' : ''}${shDiff.toFixed(2)}`,
-              diffColor: shDiff >= 0 ? bull : bear,
-              note: shDiff >= 0 ? 'better' : 'worse',
+              ftColor: ftSh >= bhSh ? bull : bear,
+              note: ftSh >= bhSh ? '5T better' : '5T worse',
             },
             {
               metric: 'Vol (ann.)',
-              composite: pct2(ftVol),
+              ft: pct2(ftVol),
+              veto30: pct2(v30Vol),
               bh: pct2(bhVol),
-              diff: pp(volDiff),
-              diffColor: volDiff < 0 ? bull : bear,
-              note: volDiff < 0 ? '↓ less' : '↑ more',
+              ftColor: ftVol < bhVol ? bull : bear,
+              note: ftVol < bhVol ? '5T lower vol' : '5T higher vol',
             },
             {
               metric: 'Time DD>5%',
-              composite: pct2(ftTdd),
+              ft: pct2(ftTdd),
+              veto30: pct2(v30Tdd),
               bh: pct2(bhTdd),
-              diff: pp(tddDiff),
-              diffColor: tddDiff < 0 ? bull : bear,
-              note: tddDiff < 0 ? 'less stress' : 'more stress',
+              ftColor: ftTdd < bhTdd ? bull : bear,
+              note: ftTdd < bhTdd ? '5T less stress' : '5T more stress',
             },
           ];
 
@@ -191,9 +200,9 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
               <thead>
                 <tr>
                   <th>Metric</th>
-                  <th style={{ color: '#3d7fd4' }}>Composite (5-Tier)</th>
+                  <th style={{ color: '#3d7fd4' }}>5-Tier</th>
+                  <th style={{ color: '#f59e0b' }}>Veto&lt;30</th>
                   <th style={{ color: '#565a61' }}>Buy &amp; Hold</th>
-                  <th>Diff</th>
                   <th>Notes</th>
                 </tr>
               </thead>
@@ -201,10 +210,10 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
                 {rows.map(r => (
                   <tr key={r.metric}>
                     <td><strong>{r.metric}</strong></td>
-                    <td style={{ color: '#3d7fd4' }}>{r.composite}</td>
+                    <td style={{ color: '#3d7fd4' }}>{r.ft}</td>
+                    <td style={{ color: '#f59e0b' }}>{r.veto30}</td>
                     <td style={{ color: '#565a61' }}>{r.bh}</td>
-                    <td style={{ color: r.diffColor }}>{r.diff}</td>
-                    <td style={{ color: r.diffColor, fontSize: 11 }}>{r.note}</td>
+                    <td style={{ color: r.ftColor, fontSize: 11 }}>{r.note}</td>
                   </tr>
                 ))}
               </tbody>
@@ -226,6 +235,7 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
               { color: '#565a61', label: 'Buy & Hold', dash: true },
               { color: '#3d7fd4', label: '5-Tier' },
               { color: '#1fa876', label: 'Binary ≥60' },
+              { color: '#f59e0b', label: 'Veto<30', dash: true },
               { color: '#d62728', label: '10m SMA', dash: true },
             ].map(({ color, label, dash }) => (
               <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -288,10 +298,11 @@ export function StrategyPanel({ timeseries, compositeScore }: Props) {
           </thead>
           <tbody>
             {[
-              { label: 'Buy & Hold',   m: metrics.bh,  curve: bh,  color: '#565a61' },
-              { label: '5-Tier',       m: metrics.ft,  curve: ft,  color: '#3d7fd4' },
-              { label: 'Binary ≥60',   m: metrics.b60, curve: b60, color: '#1fa876' },
-              { label: '10m SMA',      m: metrics.sma, curve: sma, color: '#d62728' },
+              { label: 'Buy & Hold',   m: metrics.bh,     curve: bh,     color: '#565a61' },
+              { label: '5-Tier',       m: metrics.ft,     curve: ft,     color: '#3d7fd4' },
+              { label: 'Binary ≥60',   m: metrics.b60,    curve: b60,    color: '#1fa876' },
+              { label: 'Veto<30',      m: metrics.veto30, curve: veto30, color: '#f59e0b' },
+              { label: '10m SMA',      m: metrics.sma,    curve: sma,    color: '#d62728' },
             ].map(({ label, m, curve, color }) => (
               <tr key={label}>
                 <td style={{ color }}><strong>{label}</strong></td>

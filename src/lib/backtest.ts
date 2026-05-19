@@ -12,6 +12,11 @@ export function fiveTierExposure(score: number): number {
   return 0.2;
 }
 
+/** veto_30: full long (100%) unless score < 30, then cash (0%). */
+export function veto30Exposure(score: number): number {
+  return score >= 30 ? 1.0 : 0.0;
+}
+
 /** 10-month moving average filter — long when SPY price > SMA10, else cash.
  *  Approximates the classic 200-day MA strategy on monthly data. */
 export function sma10Exposure(rows: TsRow[], i: number): number {
@@ -22,7 +27,7 @@ export function sma10Exposure(rows: TsRow[], i: number): number {
   return rows[i].spy > sma ? 1.0 : 0.0;
 }
 
-export function buildCurve(timeseries: TsRow[]): { labels: string[]; bh: number[]; ft: number[]; b60: number[]; sma: number[] } {
+export function buildCurve(timeseries: TsRow[]): { labels: string[]; bh: number[]; ft: number[]; b60: number[]; sma: number[]; veto30: number[] } {
   // Use ALL consecutive monthly rows (not just scored ones) to avoid
   // multi-month return jumps across scoring gaps.
   // Score is carried forward from the most recent scored month.
@@ -32,27 +37,30 @@ export function buildCurve(timeseries: TsRow[]): { labels: string[]; bh: number[
   const ft: number[] = [];
   const b60: number[] = [];
   const sma: number[] = [];
+  const veto30: number[] = [];
 
-  let bhV = 100, ftV = 100, b60V = 100, smaV = 100;
+  let bhV = 100, ftV = 100, b60V = 100, smaV = 100, veto30V = 100;
   let lastScore: number | null = null;
   const firstScored = rows.findIndex(r => r.score !== null);
-  if (firstScored < 0) return { labels, bh, ft, b60, sma };
+  if (firstScored < 0) return { labels, bh, ft, b60, sma, veto30 };
 
   for (let i = firstScored; i < rows.length - 1; i++) {
     if (rows[i].score !== null) lastScore = rows[i].score;
     if (lastScore === null) continue;
     const ret = rows[i + 1].spy / rows[i].spy - 1;
-    bhV  *= (1 + ret);
-    ftV  *= (1 + fiveTierExposure(lastScore) * ret);
-    b60V *= (1 + binaryExposure(lastScore) * ret);
-    smaV *= (1 + sma10Exposure(rows, i) * ret);
+    bhV     *= (1 + ret);
+    ftV     *= (1 + fiveTierExposure(lastScore) * ret);
+    b60V    *= (1 + binaryExposure(lastScore) * ret);
+    smaV    *= (1 + sma10Exposure(rows, i) * ret);
+    veto30V *= (1 + veto30Exposure(lastScore) * ret);
     labels.push(rows[i + 1].date);
     bh.push(+bhV.toFixed(2));
     ft.push(+ftV.toFixed(2));
     b60.push(+b60V.toFixed(2));
     sma.push(+smaV.toFixed(2));
+    veto30.push(+veto30V.toFixed(2));
   }
-  return { labels, bh, ft, b60, sma };
+  return { labels, bh, ft, b60, sma, veto30 };
 }
 
 export function cagr(curve: number[], nMonths: number): number {

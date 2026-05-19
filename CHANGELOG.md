@@ -5,6 +5,15 @@ Use it to avoid repeating the same mistakes.
 
 ---
 
+## [v5.7.7] — 2026-05-19
+
+### Honesty fix Y3 — StrategyPanel honest framing + veto_30 strategy
+
+- **Y3 `src/lib/backtest.ts`** — Added `veto30Exposure(score)`: returns 1.0 (full long) when score ≥ 30, else 0.0 (cash). Added `veto30` equity curve to `buildCurve()` return value.
+- **Y3 `src/components/StrategyPanel.tsx`** — C1 risk-comparison table headline rewritten from "risk-adjusted edge" to "Composite trades CAGR for drawdown reduction — it does not deliver more return than B&H on this sample." Added Veto<30 column to the C1 table and live metrics table. Added Veto<30 (amber dashed) to the equity curve chart. Two simpler rules (veto_30 and Binary ≥60) beat 5-Tier on CAGR; 5-Tier's case is lower drawdown / less time underwater, not return.
+
+---
+
 ## [v5.7.6] — 2026-05-19
 
 ### Honesty fix Y2 — MathPanel regime table now shows OOS-only rho column
