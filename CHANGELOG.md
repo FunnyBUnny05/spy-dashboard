@@ -5,6 +5,14 @@ Use it to avoid repeating the same mistakes.
 
 ---
 
+## [v5.7.6] — 2026-05-19
+
+### Honesty fix Y2 — MathPanel regime table now shows OOS-only rho column
+
+- **Y2 `src/components/MathPanel.tsx`** — Replaced the C3 regime-conditional Spearman table (3 columns: Era, ρ, n) with a 5-column table (Period, ρ incl. in-sample, ρ OOS only, n_OOS, Interpretation). OOS-only numbers: 2011–2016 ρ=−0.041 (no skill), 2017–2020 ρ=+0.395, 2021–2025 ρ=+0.817. Footnote added: "Pre-2017 OOS rho is statistically indistinguishable from zero. Treat the model as well-calibrated only for 2017+ data." The old table showed 0.19 for 2010–15, implying real (if weak) skill; the OOS truth is ρ ≈ 0. All numbers reproducible from model.json timeseries.
+
+---
+
 ## [v5.7.5] — 2026-05-19
 
 ### Honesty fix Y1 — reject E2 isotonic recalibration proposal

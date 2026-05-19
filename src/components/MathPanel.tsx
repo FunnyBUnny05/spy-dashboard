@@ -21,42 +21,47 @@ export function MathPanel({ signals, composite }: Props) {
     <>
     <div className="chart-box" style={{ marginTop: 16 }}>
       <div className="chart-title">
-        <span>Regime-conditional Spearman ρ — pred vs realised 12m return</span>
-        <span style={{ color: 'var(--text3)', fontSize: 10 }}>source: v3 audit · docs/v3_audit/results.json</span>
+        <span>Regime-conditional Spearman ρ — score vs realised 12m return</span>
+        <span style={{ color: 'var(--text3)', fontSize: 10 }}>source: model.json timeseries · both columns reproducible from data</span>
       </div>
       <table>
         <thead>
           <tr>
-            <th>Era</th>
-            <th>ρ</th>
-            <th>n</th>
+            <th>Period</th>
+            <th>ρ (incl. in-sample)</th>
+            <th>ρ (OOS only)</th>
+            <th>n_OOS</th>
             <th>Interpretation</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td>2010–2015</td>
-            <td className="warn">+0.19</td>
-            <td style={{ color: 'var(--text3)' }}>61</td>
-            <td style={{ fontSize: 11, color: 'var(--text3)' }}>Model essentially didn't work</td>
+            <td>2011–2016</td>
+            <td style={{ color: 'var(--text2)' }}>+0.254</td>
+            <td className="bear">−0.041</td>
+            <td style={{ color: 'var(--text3)' }}>36</td>
+            <td style={{ fontSize: 11, color: 'var(--bear)' }}>No OOS skill — ρ ≈ 0</td>
           </tr>
           <tr>
-            <td>2016–2020</td>
-            <td style={{ color: '#60a5fa' }}>+0.38</td>
-            <td style={{ color: 'var(--text3)' }}>58</td>
-            <td style={{ fontSize: 11, color: 'var(--text3)' }}>Moderate fit</td>
+            <td>2017–2020</td>
+            <td style={{ color: '#60a5fa' }}>+0.395</td>
+            <td style={{ color: '#60a5fa' }}>+0.395</td>
+            <td style={{ color: 'var(--text3)' }}>46</td>
+            <td style={{ fontSize: 11, color: 'var(--text3)' }}>Moderate OOS fit</td>
           </tr>
           <tr>
-            <td>2021–2026</td>
-            <td className="bull">+0.82</td>
+            <td>2021–2025</td>
+            <td className="bull">+0.817</td>
+            <td className="bull">+0.817</td>
             <td style={{ color: 'var(--text3)' }}>53</td>
-            <td style={{ fontSize: 11, color: 'var(--warn)' }}>Strong — but partly in-sample ⚠</td>
+            <td style={{ fontSize: 11, color: 'var(--bull,#4ade80)' }}>Strong OOS fit</td>
           </tr>
         </tbody>
       </table>
       <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 8 }}>
-        2021–2026 ρ is partly in-sample — model was fitted on data through early 2025.
-        Earlier eras are fully out-of-sample. Trend suggests genuine improvement, not just overfitting.
+        Pre-2017 OOS rho is statistically indistinguishable from zero.
+        Treat the model as well-calibrated only for 2017+ data; earlier evidence is in-sample-contaminated.
+        The 0.488 headline OOS ρ is almost entirely a 2021–2025 phenomenon.
       </div>
     </div>
     <div className="two-col">
