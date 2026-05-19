@@ -5,6 +5,15 @@ Use it to avoid repeating the same mistakes.
 
 ---
 
+## [v5.7.4] — 2026-05-19
+
+### Accuracy fixes X1/X2 — walk_forward_score.py VIX divisor and pred/score consistency
+
+- **X1 `scripts/walk_forward_score.py`** — Fixed `score_one()` VIX standardization bug: was dividing by `vix_z_mean` (18.38) instead of `vix_z_std` (6.63), compressing `vix_z` by ~2.77× and systematically under-estimating heteroscedasticity in high-VIX periods. Corrected to `(vix_raw - vix_z_mean) / vix_z_std`. Added `vix_z_std` parameter to both `score_one()` signature and `main()` call site. **Note:** Re-emission of corrected OOS scores requires the master dataset CSV at `/tmp/velv/master_dataset.csv` — current `model.json` timeseries data reflects the old (buggy) values until the script is re-run.
+- **X2 `scripts/walk_forward_score.py`** — Implemented Option 1 (pred/score consistency): script now emits `pred` (walk-forward fit) alongside `score` into timeseries rows, so `pred` and `score` are always consistent for OOS rows. In-sample rows keep full-sample `pred` from `fit_ridge.py`. Same CSV dependency as X1.
+
+---
+
 ## [v5.7.3] — 2026-05-18
 
 ### Audit findings Groups C, E, F — dashboard panels, proposals, test coverage

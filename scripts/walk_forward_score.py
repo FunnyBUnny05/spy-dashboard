@@ -81,14 +81,13 @@ def standardize_rg(X_train):
     return X_z, means, stds, sorted_arrs
 
 
-def score_one(pred, drift, vix_raw, resid_var_a, resid_var_b, resid_var_floor, vix_z_mean):
-    vix_z = (vix_raw - vix_z_mean) / vix_z_mean  # simple standardization matching scoring.ts
+def score_one(pred, drift, vix_raw, resid_var_a, resid_var_b, resid_var_floor, vix_z_mean, vix_z_std):
+    vix_z = (vix_raw - vix_z_mean) / vix_z_std
     var_t = max(resid_var_a + resid_var_b * vix_z, resid_var_floor)
     sigma_t = float(np.sqrt(var_t))
     if sigma_t == 0:
         return 50.0
-    z = (pred - drift) / sigma_t
-    return float(stats.norm.cdf(z) * 100)
+    return float(stats.norm.cdf((pred - drift) / sigma_t) * 100)
 
 
 def main():
@@ -118,8 +117,9 @@ def main():
     rv_b     = float(model['resid_var_b'])
     rv_floor = float(model['resid_var_floor'])
     vix_z_mean = float(model['vix_z_mean'])
+    vix_z_std  = float(model['vix_z_std'])
 
-    results: dict[str, float] = {}   # date_str → score_wf
+    results: dict[str, dict] = {}   # date_str → {score, pred}
 
     n = len(df)
     for t in range(MIN_TRAIN, n):
@@ -145,27 +145,29 @@ def main():
         pred_wf  = float(intercept + test_z @ beta)
 
         vix_raw = float(row['vix_close'])
-        s_wf    = score_one(pred_wf, drift_wf, vix_raw, rv_a, rv_b, rv_floor, vix_z_mean)
+        s_wf    = score_one(pred_wf, drift_wf, vix_raw, rv_a, rv_b, rv_floor, vix_z_mean, vix_z_std)
 
         date_str = row['date'].strftime('%Y-%m')
-        results[date_str] = round(s_wf, 2)
+        results[date_str] = {'score': round(s_wf, 2), 'pred': round(pred_wf, 6)}
         if t % 20 == 0:
             print(f"  t={t:3d}  {date_str}  pred_wf={pred_wf:.4f}  score_wf={s_wf:.1f}")
 
     print(f"\nComputed {len(results)} walk-forward scores")
 
-    # Patch model.json timeseries
+    # Patch model.json timeseries — overwrite score and pred for OOS rows with WF values
     ts = model['timeseries']
     patched = 0
     for row in ts:
         date_key = row.get('d', '')
         if date_key in results:
-            row['score_wf'] = results[date_key]
+            row['score'] = results[date_key]['score']
+            if not row.get('in_sample'):
+                row['pred'] = results[date_key]['pred']
             patched += 1
 
     MFILE.write_text(json.dumps(model, indent=2))
     print(f"Patched {patched} timeseries rows in {MFILE}")
-    print("Done. Restart the Vite dev server to see walk-forward scores in the Track Record tab.")
+    print("Done. Restart the Vite dev server to see updated scores.")
 
 
 if __name__ == '__main__':
