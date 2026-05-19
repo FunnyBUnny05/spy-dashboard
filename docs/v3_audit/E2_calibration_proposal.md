@@ -13,3 +13,19 @@ The walk-forward audit found the composite model is 3–7 percentage points too 
 ## Recommendation
 
 **Option 2 — post-hoc isotonic recalibration of `pred` in `scoring.ts`** is the right path. It is mathematically principled: isotonic regression is specifically designed to fix monotonicity-preserving probability miscalibration, and the 3–7pp over-optimism pattern in deciles 6–9 is exactly the shape of problem it corrects. The calibration lookup table (a short array of breakpoints derived from the audit's reliability diagram) can be embedded directly in `scoring.ts` as a small constant, keeping the fix visible and auditable in the TypeScript layer without requiring a Python environment. Option 3 should be explicitly rejected — adjusting thresholds without fixing the underlying `pred` miscalibration means the exposure recommendations attached to `stanceFor` will still be wrong even if the badge label looks better. Option 1 remains the long-term correct solution and should be scheduled as a model refresh, but it is not a blocker for the immediate calibration fix.
+
+---
+
+## REJECTED 2026-05-19
+
+Forward-walk test (36m initial, refit yearly, 96 OOS months) showed isotonic
+regression increases RMSE from 9.91% to 12.58% and adds a −3.71% bias. The
+in-sample deciles 6–9 over-optimism is sample noise (n_eff = 3–4 per bucket)
+not a recalibratable bias. Do not ship.
+
+| Method   | RMSE   | MAE   | Bias   |
+|----------|--------|-------|--------|
+| Raw pred | 9.91%  | 7.46% | +0.98% |
+| Isotonic | 12.58% | 9.40% | −3.71% |
+
+Do **not** add any isotonic code to `src/lib/scoring.ts`.

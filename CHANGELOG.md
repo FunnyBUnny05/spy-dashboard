@@ -5,6 +5,14 @@ Use it to avoid repeating the same mistakes.
 
 ---
 
+## [v5.7.5] — 2026-05-19
+
+### Honesty fix Y1 — reject E2 isotonic recalibration proposal
+
+- **Y1 `docs/v3_audit/E2_calibration_proposal.md`** — Marked proposal REJECTED based on forward-walk test (36m initial, refit yearly, 96 OOS months): isotonic regression increased RMSE from 9.91% to 12.58% and added −3.71% bias. The deciles 6–9 over-optimism is in-sample sample noise (n_eff=3–4 per bucket), not a recalibratable bias. Do not add isotonic code to `scoring.ts`.
+
+---
+
 ## [v5.7.4] — 2026-05-19
 
 ### Accuracy fixes X1/X2 — walk_forward_score.py VIX divisor and pred/score consistency
