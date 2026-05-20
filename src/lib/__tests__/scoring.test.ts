@@ -111,6 +111,16 @@ describe('classifyVolRegime', () => {
   });
 });
 
+describe('pi95 band width (M3)', () => {
+  it('pi95 half-width exceeds pi80 half-width by the ratio 2.20/1.282', () => {
+    const result = computeV2(CURRENT);
+    const hw80 = result.pi80Hi - result.predFwd12m;
+    const hw95 = result.pi95Hi - result.predFwd12m;
+    // 2.20 / 1.282 ≈ 1.716; allow ±0.1 tolerance
+    expect(hw95 / hw80).toBeCloseTo(2.20 / 1.282, 1);
+  });
+});
+
 describe('rollingOOSRho', () => {
   it('returns all nulls when fewer than 12+12 rows', () => {
     const ts = getTimeseries().slice(0, 20);

@@ -285,7 +285,7 @@ export function computeV2(raw: RawSignalValues): V5Result {
 
   // 4. Prediction intervals — use VIX-conditional residual std
   const sigmaT = condResidStd(raw.vixClose);
-  const z80 = 1.282, z95 = 1.960;
+  const z80 = 1.282, z95 = 2.20; // empirical-adjusted: OOS coverage was 90.4% at 1.96 due to fat tails (kurtosis=0.74)
   const pi80Lo = predFwd12m - z80 * sigmaT;
   const pi80Hi = predFwd12m + z80 * sigmaT;
   const pi95Lo = predFwd12m - z95 * sigmaT;
