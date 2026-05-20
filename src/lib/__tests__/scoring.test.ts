@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { stanceZoneFor, scoreUncertainty, computeV2, bucketFor, BUCKETS, scoreAAII, getAAIIData, classifyVolRegime, rollingOOSRho, getTimeseries, DRIFT_LABEL } from '../scoring';
+import { stanceZoneFor, scoreUncertainty, computeV2, bucketFor, BUCKETS, scoreAAII, getAAIIData, classifyVolRegime, rollingOOSRho, getTimeseries, DRIFT_LABEL, volCorrectedPred } from '../scoring';
 import { CURRENT } from '../snapshot';
 
 describe('stanceZoneFor', () => {
@@ -128,6 +128,25 @@ describe('M4 median anchor', () => {
 
   it('DRIFT_LABEL contains 14 (median ~13.8% rounds to 14%)', () => {
     expect(DRIFT_LABEL).toContain('14');
+  });
+});
+
+describe('volCorrectedPred (M1)', () => {
+  it('returns pred unchanged when fewer than 24 training residuals', () => {
+    const shortResids = Array.from({ length: 10 }, (_, i) => ({ resid: 0.01 * i, vol12: 0.10 + 0.005 * i }));
+    expect(volCorrectedPred(0.12, 0.13, shortResids)).toBe(0.12);
+  });
+
+  it('returns a finite number with sufficient training data', () => {
+    const resids = Array.from({ length: 36 }, (_, i) => ({ resid: (i % 3 - 1) * 0.02, vol12: 0.10 + 0.005 * (i % 5) }));
+    const result = volCorrectedPred(0.12, 0.13, resids);
+    expect(Number.isFinite(result)).toBe(true);
+  });
+
+  it('returns a finite number when all vol12 values are identical (zero denominator guard)', () => {
+    const resids = Array.from({ length: 30 }, () => ({ resid: 0.01, vol12: 0.12 }));
+    const result = volCorrectedPred(0.10, 0.12, resids);
+    expect(Number.isFinite(result)).toBe(true);
   });
 });
 

@@ -575,3 +575,27 @@ export function rollingOOSRho(rows: TsRow[], windowMonths: number = 36): (number
   }
   return out;
 }
+
+// ── Vol-conditional bias correction (M1 Option A) ─────────────────────────────
+// OLS: resid_t = a + b * vol12_t → pred_corrected = pred + a_hat + b_hat * vol12_current
+// Raises OOS Spearman ρ from 0.460 to 0.516 on forward-walk test (init=36m).
+// DO NOT use as a drop-in for scoring — shifts score distribution left and breaks tier rules.
+// Surface as a transparency figure only (see CLAUDE_HANDOFF_v7_MATH.md M1).
+export function volCorrectedPred(
+  pred: number,
+  vol12: number,
+  trainingResids: { resid: number; vol12: number }[]
+): number {
+  if (trainingResids.length < 24) return pred;
+  const n = trainingResids.length;
+  const xMean = trainingResids.reduce((s, r) => s + r.vol12, 0) / n;
+  const yMean = trainingResids.reduce((s, r) => s + r.resid, 0) / n;
+  let num = 0, den = 0;
+  for (const r of trainingResids) {
+    num += (r.vol12 - xMean) * (r.resid - yMean);
+    den += (r.vol12 - xMean) ** 2;
+  }
+  const b = den < 1e-12 ? 0 : num / den;
+  const a = yMean - b * xMean;
+  return pred + a + b * vol12;
+}
