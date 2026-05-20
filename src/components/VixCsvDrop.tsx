@@ -119,6 +119,13 @@ export function VixCsvDrop({ onSignals, initialSignals }: Props) {
     if (file) processFile(file);
   }, [processFile]);
 
+  const handleClear = useCallback(() => {
+    setSignals(null);
+    setStatus('idle');
+    setMessage('');
+    onSignals(null);
+  }, [onSignals]);
+
   const interp = signals ? vixLabel(signals.vixClose) : null;
 
   return (
@@ -159,6 +166,11 @@ export function VixCsvDrop({ onSignals, initialSignals }: Props) {
             : message}
         </label>
       </div>
+      {status === 'ok' && (
+        <button className="csv-clear-btn" onClick={handleClear}>
+          × Clear — revert to snapshot fallback
+        </button>
+      )}
 
       {signals && interp && (
         <div className="csv-results">

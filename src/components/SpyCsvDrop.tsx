@@ -300,6 +300,13 @@ export function SpyCsvDrop({ onSignals, initialSignals }: Props) {
     if (file) processFile(file);
   }, [processFile]);
 
+  const handleClear = useCallback(() => {
+    setSignals(null);
+    setStatus('idle');
+    setMessage('');
+    onSignals(null);
+  }, [onSignals]);
+
   const scores = signals ? scoreFromSpySignals(signals) : null;
 
   return (
@@ -343,6 +350,11 @@ export function SpyCsvDrop({ onSignals, initialSignals }: Props) {
             : message}
         </label>
       </div>
+      {status === 'ok' && (
+        <button className="csv-clear-btn" onClick={handleClear}>
+          × Clear — revert to snapshot fallback
+        </button>
+      )}
 
       {signals && scores && (
         <div className="csv-results">

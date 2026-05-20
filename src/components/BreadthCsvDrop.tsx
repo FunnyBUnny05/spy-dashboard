@@ -162,6 +162,13 @@ export function BreadthCsvDrop({ onSignals, initialSignals, spyReturn12m }: Prop
     if (file) processFile(file);
   }, [processFile]);
 
+  const handleClear = useCallback(() => {
+    setSignals(null);
+    setStatus('idle');
+    setMessage('');
+    onSignals(null);
+  }, [onSignals]);
+
   const interp = signals ? breadthLabel(signals.breadth12mChg) : null;
 
   return (
@@ -196,6 +203,11 @@ export function BreadthCsvDrop({ onSignals, initialSignals, spyReturn12m }: Prop
           {status === 'idle' || status === 'hover' ? 'Drop RSP CSV here or click to browse' : message}
         </label>
       </div>
+      {status === 'ok' && (
+        <button className="csv-clear-btn" onClick={handleClear}>
+          × Clear — revert to snapshot fallback
+        </button>
+      )}
 
       {signals && interp && (
         <div className="csv-results">

@@ -210,6 +210,14 @@ export function YieldCurveCsvDrop({ onSignals, initialSignals }: Props) {
     reader.readAsText(file);
   };
 
+  const handleClear = useCallback(() => {
+    setRows10y(null);
+    setRows3m(null);
+    setSignals(null);
+    setError(null);
+    onSignals(null);
+  }, [onSignals]);
+
   const interp = signals ? spreadLabel(signals.yieldSpread) : null;
 
   return (
@@ -245,6 +253,12 @@ export function YieldCurveCsvDrop({ onSignals, initialSignals }: Props) {
           onFile={makeFileHandler('3m')}
         />
       </div>
+
+      {(signals || initialSignals) && (
+        <button className="csv-clear-btn" onClick={handleClear}>
+          × Clear — revert to snapshot fallback
+        </button>
+      )}
 
       {error && (
         <div style={{ marginTop: 8, color: 'var(--bear)', fontSize: 12 }}>✗ {error}</div>
