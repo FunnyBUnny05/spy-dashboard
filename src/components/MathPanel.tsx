@@ -10,7 +10,7 @@ interface Props {
   timeseries: TsRow[];
 }
 
-const DRIFT      = (modelData as any).drift        as number;
+const DRIFT      = ((modelData as any).median_fwd12 ?? (modelData as any).drift) as number;
 const OOS_RHO    = (modelData as any).oos_rho      as number;
 const OOS_N      = (modelData as any).oos_n        as number;
 const INTERCEPT  = (modelData as any).ridge_intercept as number;
@@ -191,7 +191,7 @@ export function MathPanel({ signals, composite, timeseries }: Props) {
           <tbody>
             <tr><td>Ridge α</td><td>{ALPHA}</td></tr>
             <tr><td>Ridge intercept</td><td>{(INTERCEPT * 100).toFixed(2)}%</td></tr>
-            <tr><td>Drift (sample mean)</td><td>{(DRIFT * 100).toFixed(2)}%</td></tr>
+            <tr><td>Drift anchor (median fwd12)</td><td>{(DRIFT * 100).toFixed(2)}%</td></tr>
             <tr><td>OOS Spearman ρ</td><td>{OOS_RHO.toFixed(3)}</td></tr>
             <tr><td>OOS n</td><td>{OOS_N} walk-forward predictions</td></tr>
             <tr><td>σ² intercept (a)</td><td>{RESID_VAR_A.toFixed(5)}</td></tr>
@@ -205,7 +205,7 @@ export function MathPanel({ signals, composite, timeseries }: Props) {
           Coefficients forced to share sign with univariate ρ; constraint auto-prunes 3 of the 7 (RSI, EMA dist, MDebt).
           Effective model uses 4 active signals: PPI, AAII, Yield Curve, Breadth
           → pred_fwd_12m = intercept + Σ coef·z → composite score = Φ((pred − drift) / σ(VIX)) × 100.
-          score=50 ⟺ pred equals historical drift ({(DRIFT*100).toFixed(1)}%).
+          score=50 ⟺ pred equals fwd12 median ({(DRIFT*100).toFixed(1)}%).
           Residual std is heteroscedastic: σ²(t) = max(floor, {RESID_VAR_A.toFixed(4)} + {RESID_VAR_B >= 0 ? '+' : ''}{RESID_VAR_B.toFixed(4)}·vix_z).
           OOS Spearman ρ={OOS_RHO.toFixed(3)}, n={OOS_N}.
         </div>

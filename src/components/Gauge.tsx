@@ -2,7 +2,7 @@ import { regimeLabel, toneColor, toneForScore } from '../lib/format';
 import { TsRow } from '../lib/scoring';
 import { ScoreSparkline } from './ScoreSparkline';
 
-const DRIFT_TOOLTIP = 'Score 50 = predicted return matches the 2009–2026 sample mean (~15%/yr). This is above the long-run SPY average (~10%). A score of ~40 corresponds to a neutral expectation vs. long-run base rates.';
+const DRIFT_TOOLTIP = 'Score 50 = predicted return matches the 2009–2026 median fwd 12m (~14%/yr). A score below 50 means the model predicts returns below the historical median.';
 
 interface Props {
   score: number;

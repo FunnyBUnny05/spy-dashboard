@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { stanceZoneFor, scoreUncertainty, computeV2, bucketFor, BUCKETS, scoreAAII, getAAIIData, classifyVolRegime, rollingOOSRho, getTimeseries } from '../scoring';
+import { stanceZoneFor, scoreUncertainty, computeV2, bucketFor, BUCKETS, scoreAAII, getAAIIData, classifyVolRegime, rollingOOSRho, getTimeseries, DRIFT_LABEL } from '../scoring';
 import { CURRENT } from '../snapshot';
 
 describe('stanceZoneFor', () => {
@@ -118,6 +118,16 @@ describe('pi95 band width (M3)', () => {
     const hw95 = result.pi95Hi - result.predFwd12m;
     // 2.20 / 1.282 ≈ 1.716; allow ±0.1 tolerance
     expect(hw95 / hw80).toBeCloseTo(2.20 / 1.282, 1);
+  });
+});
+
+describe('M4 median anchor', () => {
+  it('DRIFT_LABEL mentions median', () => {
+    expect(DRIFT_LABEL.toLowerCase()).toContain('median');
+  });
+
+  it('DRIFT_LABEL contains 14 (median ~13.8% rounds to 14%)', () => {
+    expect(DRIFT_LABEL).toContain('14');
   });
 });
 

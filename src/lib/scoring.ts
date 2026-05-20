@@ -34,7 +34,7 @@
  *   3. pred_fwd_12m = intercept + Σ ridge_coef_k * rg_k
  *      (4–5 of the 9 ridge_coefs are exactly 0 by sign-constraint)
  *   4. Composite score = norm.cdf((pred − drift) / σ(VIX)) × 100
- *      where drift = full-sample mean fwd_12m (≈15%/yr, 2009–2026 sample).
+ *      where drift = full-sample median fwd_12m (≈14%/yr, 2009–2026 sample).
  *      score=50 ⇔ pred = drift.
  *   5. Empirical historical percentiles for all 9 signals.
  */
@@ -86,8 +86,8 @@ const STDS        = (modelData as any).stds    as Record<string, number>;
 const RIDGE_COEFS = (modelData as any).ridge_coefs as Record<string, number>;
 const RIDGE_INT   = (modelData as any).ridge_intercept as number;
 const RESID_STD   = (modelData as any).resid_std as number;
-const DRIFT       = (modelData as any).drift as number;
-export const DRIFT_LABEL = `score 50 = predicted return equal to ${(DRIFT * 100).toFixed(0)}%/yr (2009–2026 sample mean)`;
+const DRIFT       = ((modelData as any).median_fwd12 ?? (modelData as any).drift) as number;
+export const DRIFT_LABEL = `score 50 = predicted return equal to median historical fwd 12m (${(DRIFT * 100).toFixed(0)}%/yr)`;
 
 // Heteroscedastic residual variance:  σ²(t) = max(floor, a + b · vix_z(t))
 const RESID_VAR_A     = ((modelData as any).resid_var_a     ?? RESID_STD * RESID_STD) as number;
