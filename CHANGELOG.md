@@ -5,6 +5,23 @@ Use it to avoid repeating the same mistakes.
 
 ---
 
+## [v5.9.0] — 2026-05-20
+
+### v7 math improvements (M1, M3, M4)
+
+- **M3 `src/lib/scoring.ts`** — Widened 95% PI band: `z95` changed from 1.960 to 2.20. Empirical OOS coverage was 90.4% at 1.96; root cause is fat tails (excess kurtosis 0.74), not wrong σ. The 80% band (z=1.282) is unchanged — it was already accurate at 79.4%.
+- **M4 `src/data/model.json`** — Added `median_fwd12: 0.1380` field (computed from 185 fwd12 rows in timeseries).
+- **M4 `src/lib/scoring.ts`** — `DRIFT` constant now reads `median_fwd12` (13.8%) instead of `drift` (15.0%). `DRIFT_LABEL` updated to say "median historical fwd 12m". This shifts score=50 from "equal to sample mean" to "equal to sample median", making moderate bull preds read as neutral rather than bearish.
+- **M4 `src/components/MathPanel.tsx`** — "Drift (sample mean)" row relabeled to "Drift anchor (median fwd12)". Callout updated accordingly.
+- **M4 `src/components/Gauge.tsx`** — `DRIFT_TOOLTIP` updated to reference median anchor.
+- **M1 `src/lib/scoring.ts`** — Added `volCorrectedPred` export. OLS bias correction using trailing 12m realized vol: OOS Spearman ρ 0.460 → 0.516, RMSE 11.28% → 10.62%. Display only — does not affect score or strategy logic.
+- **M1 `src/components/MathPanel.tsx`** — Added "Vol-corrected pred" row below "Ridge pred 12m" in the signal contributions table, showing corrected value, current vol12, and delta vs raw pred.
+- **M2 `docs/v3_audit/E0_dead_ends.md`** — Appended entries 6–10: smooth exposure functions, vol-bias drop-in replacement, empirical-quantile PI bands, lag-12 residual correction, combined vol+lag-12 correction.
+
+No model weights changed. `computeV2`, `stanceZoneFor`, strategy logic, and training procedure untouched.
+
+---
+
 ## [v5.8.0] — 2026-05-20
 
 ### v6 forward-additive improvements (F1–F4)
