@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Line } from 'react-chartjs-2';
-import { SignalSpec, TsRow, rollingOOSRho } from '../lib/scoring';
+import { SignalSpec, TsRow, rollingOOSRho, volCorrectedPred } from '../lib/scoring';
 import { tickStyle, gridStyle } from '../lib/chartSetup';
 import modelData from '../data/model.json';
 
@@ -20,6 +20,41 @@ const RESID_VAR_B = (modelData as any).resid_var_b as number;
 
 export function MathPanel({ signals, composite, timeseries }: Props) {
   const linCombo = signals.reduce((acc, s) => acc + s.ridgeCoef * s.zVal, 0);
+
+  const rawPred = INTERCEPT + linCombo;
+
+  const { volCorrPred, currentVol12 } = useMemo(() => {
+    const spyRows = timeseries.filter(r => r.spy != null && r.spy > 0);
+    const n = spyRows.length;
+
+    // Current trailing 12m realized vol
+    const lookback = Math.min(12, n - 1);
+    const rets: number[] = [];
+    for (let i = n - lookback; i < n; i++) {
+      rets.push(spyRows[i].spy / spyRows[i - 1].spy - 1);
+    }
+    const mean = rets.reduce((a, b) => a + b, 0) / (rets.length || 1);
+    const variance = rets.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, rets.length - 1);
+    const currentVol12 = Math.sqrt(variance * 12);
+
+    // Training residuals: rows with both pred and realized fwd12
+    const trainingResids: { resid: number; vol12: number }[] = [];
+    for (let i = 0; i + 12 < timeseries.length; i++) {
+      const row = timeseries[i];
+      const futRow = timeseries[i + 12];
+      if (row.pred == null || row.spy == null || futRow.spy == null) continue;
+      const fwd12 = futRow.spy / row.spy - 1;
+      const slice = timeseries.slice(Math.max(0, i - 12), i + 1).filter(r => r.spy != null && r.spy > 0);
+      if (slice.length < 3) continue;
+      const sRets: number[] = [];
+      for (let j = 1; j < slice.length; j++) sRets.push(slice[j].spy / slice[j - 1].spy - 1);
+      const sMean = sRets.reduce((a, b) => a + b, 0) / sRets.length;
+      const sVar = sRets.reduce((a, b) => a + (b - sMean) ** 2, 0) / Math.max(1, sRets.length - 1);
+      trainingResids.push({ resid: fwd12 - row.pred, vol12: Math.sqrt(sVar * 12) });
+    }
+
+    return { volCorrPred: volCorrectedPred(rawPred, currentVol12, trainingResids), currentVol12 };
+  }, [timeseries, rawPred]);
 
   const { sparkData } = useMemo(() => {
     const rhos = rollingOOSRho(timeseries, 36);
@@ -165,7 +200,22 @@ export function MathPanel({ signals, composite, timeseries }: Props) {
             <tr style={{ borderTop: '2px solid var(--border)', background: 'rgba(217,79,61,0.04)' }}>
               <td style={{ fontWeight: 600, color: 'var(--text)' }} colSpan={2}>Ridge pred 12m</td>
               <td colSpan={2} style={{ fontWeight: 700, fontSize: 14 }}>
-                {((INTERCEPT + linCombo) * 100).toFixed(2)}%
+                {(rawPred * 100).toFixed(2)}%
+              </td>
+            </tr>
+            <tr style={{ background: 'rgba(96,165,250,0.06)' }}>
+              <td style={{ color: 'var(--text3)', fontSize: 11 }} colSpan={2}>
+                Vol-corrected pred
+                <span style={{ display: 'block', fontSize: 10, color: 'var(--text3)', fontWeight: 400 }}>
+                  (vol12={( currentVol12 * 100).toFixed(1)}% · display only — does not affect score)
+                </span>
+              </td>
+              <td colSpan={2} style={{ fontWeight: 600, fontSize: 13,
+                color: volCorrPred >= rawPred ? 'var(--bull,#4ade80)' : 'var(--bear)' }}>
+                {(volCorrPred * 100).toFixed(2)}%
+                <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--text3)', marginLeft: 6 }}>
+                  ({volCorrPred >= rawPred ? '+' : ''}{((volCorrPred - rawPred) * 100).toFixed(2)}pp)
+                </span>
               </td>
             </tr>
             <tr style={{ background: 'rgba(217,79,61,0.04)' }}>

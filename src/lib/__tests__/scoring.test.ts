@@ -148,6 +148,18 @@ describe('volCorrectedPred (M1)', () => {
     const result = volCorrectedPred(0.10, 0.12, resids);
     expect(Number.isFinite(result)).toBe(true);
   });
+
+  it('applies positive correction when high-vol rows have systematically positive residuals', () => {
+    // vol12 above mean (0.15) paired with positive residuals → b > 0
+    // When current vol12 > training xMean, correction should be positive (volCorrPred > pred)
+    const resids = Array.from({ length: 30 }, (_, i) => ({
+      resid:  i % 2 === 0 ?  0.05 : -0.05,   // alternating, mean ≈ 0
+      vol12:  i % 2 === 0 ?  0.20 :  0.10,   // correlated: high vol ↔ positive resid
+    }));
+    // current vol12 = 0.20 (above xMean=0.15) → correction should be positive
+    const result = volCorrectedPred(0.10, 0.20, resids);
+    expect(result).toBeGreaterThan(0.10);
+  });
 });
 
 describe('rollingOOSRho', () => {
